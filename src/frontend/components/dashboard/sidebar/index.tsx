@@ -1,4 +1,5 @@
 import type * as React from "react"
+import { useState } from "react"
 
 import {
   Sidebar,
@@ -23,14 +24,6 @@ import { Bullet } from "@/components/ui/bullet"
 import PlusIcon from "@/components/icons/plus"
 import { LogOut } from "lucide-react"
 
-const data = {
-  user: {
-    name: "KRIMSON",
-    email: "krimson@joyco.studio",
-    avatar: "/avatars/user_krimson.png",
-  },
-}
-
 interface Channel {
   id: string
   name: string
@@ -44,8 +37,18 @@ interface DashboardSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onChannelSelect?: (channelId: string) => void
   onNewChat?: () => void
   isCreatingChannel?: boolean
-  userEmail?: string
+  userProfile?: {
+    avatarUrl: string
+    displayName: string
+    bio: string
+    email: string
+    walletAddress: string
+    memberSince: string
+  } | null
   onSignOut?: () => void
+  onAccountClick?: () => void
+  onSettingsClick?: () => void
+  onHomeClick?: () => void
 }
 
 export function DashboardSidebar({ 
@@ -55,14 +58,22 @@ export function DashboardSidebar({
   onChannelSelect = () => {},
   onNewChat = () => {},
   isCreatingChannel = false,
-  userEmail,
+  userProfile,
   onSignOut,
+  onAccountClick,
+  onSettingsClick,
+  onHomeClick,
   ...props
 }: DashboardSidebarProps) {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
   return (
     <Sidebar {...props} className={cn("py-sides", className)}>
       <SidebarHeader className="rounded-t-lg flex gap-3 flex-row rounded-b-none">
-        <div className="flex gap-3 flex-row flex-1 group">
+        <button 
+          onClick={onHomeClick}
+          className="flex gap-3 flex-row flex-1 group cursor-pointer hover:opacity-80 transition-opacity"
+        >
           <div className="flex overflow-clip size-12 shrink-0 items-center justify-center rounded bg-sidebar-primary-foreground/10 transition-colors group-hover:bg-sidebar-primary text-sidebar-primary-foreground">
             <MonkeyIcon className="size-10 group-hover:scale-[1.7] origin-top-left transition-transform" />
           </div>
@@ -70,7 +81,7 @@ export function DashboardSidebar({
             <span className="text-2xl font-display">O.T.A.K.U.</span>
             <span className="text-xs uppercase">DeFi Analyst Agent</span>
           </div>
-        </div>
+        </button>
       </SidebarHeader>
 
       <SidebarContent>
@@ -164,20 +175,20 @@ export function DashboardSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <Popover>
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                   <PopoverTrigger className="flex gap-0.5 w-full group cursor-pointer">
                     <div className="shrink-0 flex size-14 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-clip">
                       <img
-                        src={data.user.avatar}
-                        alt={data.user.name}
+                        src={userProfile?.avatarUrl || '/avatars/user_krimson.png'}
+                        alt={userProfile?.displayName || 'User'}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <div className="group/item pl-3 pr-1.5 pt-2 pb-1.5 flex-1 flex bg-sidebar-accent hover:bg-sidebar-accent-active/75 items-center rounded group-data-[state=open]:bg-sidebar-accent-active group-data-[state=open]:hover:bg-sidebar-accent-active group-data-[state=open]:text-sidebar-accent-foreground">
                       <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate text-xl font-display">{data.user.name}</span>
+                        <span className="truncate text-xl font-display">{userProfile?.displayName || 'KRIMSON'}</span>
                         <span className="truncate text-xs uppercase opacity-50 group-hover/item:opacity-100">
-                          {userEmail || data.user.email}
+                          {userProfile?.email || ''}
                         </span>
                       </div>
                       <DotsVerticalIcon className="ml-auto size-4" />
@@ -185,17 +196,36 @@ export function DashboardSidebar({
                   </PopoverTrigger>
                   <PopoverContent className="w-56 p-0" side="bottom" align="end" sideOffset={4}>
                     <div className="flex flex-col">
-                      <a href="#account" className="flex items-center px-4 py-2 text-sm hover:bg-accent">
-                        <MonkeyIcon className="mr-2 h-4 w-4" />
-                        Account
-                      </a>
-                      <a href="#settings" className="flex items-center px-4 py-2 text-sm hover:bg-accent">
-                        <GearIcon className="mr-2 h-4 w-4" />
-                        Settings
-                      </a>
+                      {onAccountClick && (
+                        <button 
+                          onClick={() => {
+                            onAccountClick();
+                            setIsPopoverOpen(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm hover:bg-accent text-left w-full"
+                        >
+                          <MonkeyIcon className="mr-2 h-4 w-4" />
+                          Account
+                        </button>
+                      )}
+                      {onSettingsClick && (
+                        <button 
+                          onClick={() => {
+                            onSettingsClick();
+                            setIsPopoverOpen(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm hover:bg-accent text-left w-full"
+                        >
+                          <GearIcon className="mr-2 h-4 w-4" />
+                          Settings
+                        </button>
+                      )}
                       {onSignOut && (
                         <button 
-                          onClick={onSignOut}
+                          onClick={() => {
+                            onSignOut();
+                            setIsPopoverOpen(false);
+                          }}
                           className="flex items-center px-4 py-2 text-sm hover:bg-accent text-left w-full"
                         >
                           <LogOut className="mr-2 h-4 w-4" />

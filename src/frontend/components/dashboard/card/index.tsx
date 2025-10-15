@@ -5,6 +5,7 @@ import { Bullet } from "@/components/ui/bullet";
 interface DashboardCardProps
   extends Omit<React.ComponentProps<typeof Card>, "title"> {
   title: string;
+  subtitle?: string;
   addon?: React.ReactNode;
   intent?: "default" | "success";
   children: React.ReactNode;
@@ -12,6 +13,7 @@ interface DashboardCardProps
 
 export default function DashboardCard({
   title,
+  subtitle,
   addon,
   intent = "default",
   children,
@@ -21,10 +23,15 @@ export default function DashboardCard({
   return (
     <Card className={className} {...props}>
       <CardHeader className="flex items-center justify-between">
-        <CardTitle className="flex items-center gap-2.5">
-          <Bullet variant={intent} />
-          {title}
-        </CardTitle>
+        <div>
+          <CardTitle className="flex items-center gap-2.5">
+            <Bullet variant={intent} />
+            {title}
+          </CardTitle>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-1 ml-5">{subtitle}</p>
+          )}
+        </div>
         {addon && <div>{addon}</div>}
       </CardHeader>
 

@@ -9,11 +9,13 @@ import { SidebarProvider } from './components/ui/sidebar';
 import { DashboardSidebar } from './components/dashboard/sidebar';
 import Widget from './components/dashboard/widget';
 import { CDPWalletCard } from './components/dashboard/cdp-wallet-card';
+import AccountPage from './components/dashboard/account/page';
 import { SignInModal } from './components/auth/SignInModal';
 import { MobileHeader } from './components/dashboard/mobile-header';
 import { MessageSquare } from 'lucide-react';
 import mockDataJson from './mock.json';
 import type { MockData } from './types/dashboard';
+import { UUID } from '@elizaos/core';
 
 const mockData = mockDataJson as MockData;
 
@@ -96,6 +98,17 @@ function App() {
   const [isLoadingChannels, setIsLoadingChannels] = useState(true);
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<'chat' | 'account' | 'settings'>('chat');
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [isLoadingUserProfile, setIsLoadingUserProfile] = useState(true);
+  const [userProfile, setUserProfile] = useState<{
+    avatarUrl: string;
+    displayName: string;
+    bio: string;
+    email: string;
+    walletAddress: string;
+    memberSince: string;
+  } | null>(null);
   const hasInitialized = useRef(false);
 
   // Initialize or update user ID when wallet address changes
@@ -143,6 +156,105 @@ function App() {
   });
 
   const agentId = agentsData?.[0]?.id;
+
+  // Sync user entity whenever userId, wallet address, or email changes
+  useEffect(() => {
+    if (!userId || !agentId || !userEmail || !evmAddress) {
+      // If any required data is missing, keep loading
+      setIsLoadingUserProfile(true);
+      return;
+    }
+
+    const syncUserEntity = async () => {
+      try {
+        setIsLoadingUserProfile(true);
+        console.log('🔄 Syncing user entity for userId:', userId);
+        
+        // Try to get existing entity
+        let entity;
+        try {
+          entity = await elizaClient.entities.getEntity(userId as any);
+          console.log('✅ Found existing entity:', entity);
+        } catch (error: any) {
+          // Entity doesn't exist, create it
+          if (error?.status === 404 || error?.code === 'NOT_FOUND') {
+            console.log('📝 Creating new user entity...');
+            entity = await elizaClient.entities.createEntity({
+              id: userId as any,
+              agentId: agentId as any,
+              names: ['KRIMSON'], // Default name
+              metadata: {
+                avatarUrl: '/avatars/user_krimson.png',
+                email: userEmail || '',
+                walletAddress: evmAddress || '',
+                displayName: 'KRIMSON',
+                bio: 'DeFi Enthusiast • Blockchain Explorer',
+                createdAt: new Date().toISOString(),
+              },
+            });
+            console.log('✅ Created user entity:', entity);
+            
+            // Set user profile state
+            setUserProfile({
+              avatarUrl: entity.metadata?.avatarUrl || '/avatars/user_krimson.png',
+              displayName: entity.metadata?.displayName || 'KRIMSON',
+              bio: entity.metadata?.bio || 'DeFi Enthusiast • Blockchain Explorer',
+              email: userEmail || '',
+              walletAddress: evmAddress || '',
+              memberSince: entity.metadata?.createdAt || new Date().toISOString(),
+            });
+            setIsLoadingUserProfile(false);
+            return;
+          }
+          throw error;
+        }
+
+        // Entity exists, check if metadata needs updating
+        const needsUpdate = 
+          !entity.metadata?.avatarUrl ||
+          !entity.metadata?.email ||
+          !entity.metadata?.walletAddress ||
+          !entity.metadata?.bio ||
+          (evmAddress && entity.metadata?.walletAddress !== evmAddress) ||
+          (userEmail && entity.metadata?.email !== userEmail);
+
+        if (needsUpdate) {
+          console.log('📝 Updating user entity metadata...');
+          const updated = await elizaClient.entities.updateEntity(userId as any, {
+            metadata: {
+              ...entity.metadata,
+              avatarUrl: entity.metadata?.avatarUrl || '/avatars/user_krimson.png',
+              email: userEmail || entity.metadata?.email || '',
+              walletAddress: evmAddress || entity.metadata?.walletAddress || '',
+              displayName: entity.metadata?.displayName || 'KRIMSON',
+              bio: entity.metadata?.bio || 'DeFi Enthusiast • Blockchain Explorer',
+              updatedAt: new Date().toISOString(),
+            },
+          });
+          console.log('✅ Updated user entity:', updated);
+          entity = updated; // Use updated entity
+        } else {
+          console.log('✅ User entity is up to date');
+        }
+        
+        // Set user profile state from entity
+        setUserProfile({
+          avatarUrl: entity.metadata?.avatarUrl || '/avatars/user_krimson.png',
+          displayName: entity.metadata?.displayName || 'KRIMSON',
+          bio: entity.metadata?.bio || 'DeFi Enthusiast • Blockchain Explorer',
+          email: userEmail || '',
+          walletAddress: evmAddress || '',
+          memberSince: entity.metadata?.createdAt || new Date().toISOString(),
+        });
+        setIsLoadingUserProfile(false);
+      } catch (error) {
+        console.error('❌ Error syncing user entity:', error);
+      }
+    };
+
+    syncUserEntity();
+  }, [userId, evmAddress, userEmail, agentId]); // Re-sync when any of these change
+
 
   // Fetch full agent details (including settings with avatar)
   const { data: agent, isLoading } = useQuery({
@@ -260,18 +372,6 @@ function App() {
         const response = await elizaClient.messaging.getServerChannels(serverIdForQuery as any);
         const dmChannels = await Promise.all(
           response.channels
-            .filter((ch: any) => {
-              if (ch.type !== 'DM') return false;
-              
-              // Check if this channel belongs to the current user
-              // Match by user1 or user2 in metadata
-              const isForUser = ch.metadata?.user1 === userId || ch.metadata?.user2 === userId;
-              
-              // Also check if it's for this specific agent
-              const isForAgent = ch.metadata?.forAgent === agent.id || ch.metadata?.user2 === agent.id;
-              
-              return isForUser && isForAgent;
-            })
             .map(async (ch: any) => {
               let createdAt = 0;
               if (ch.createdAt instanceof Date) {
@@ -445,6 +545,46 @@ function App() {
     setActiveChannelId(newChannelId);
   };
 
+  // Update user profile (avatar, displayName, bio)
+  const updateUserProfile = async (updates: {
+    avatarUrl?: string;
+    displayName?: string;
+    bio?: string;
+  }) => {
+    if (!userId || !userProfile) {
+      throw new Error('User not initialized');
+    }
+
+    try {
+      console.log('🔄 Updating user profile:', updates);
+      
+      const updated = await elizaClient.entities.updateEntity(userId as UUID, {
+        metadata: {
+          avatarUrl: updates.avatarUrl ?? userProfile.avatarUrl,
+          displayName: updates.displayName ?? userProfile.displayName,
+          bio: updates.bio ?? userProfile.bio,
+          email: userProfile.email,
+          walletAddress: userProfile.walletAddress,
+          memberSince: userProfile.memberSince,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        avatarUrl: updated.metadata?.avatarUrl || userProfile.avatarUrl,
+        displayName: updated.metadata?.displayName || userProfile.displayName,
+        bio: updated.metadata?.bio || userProfile.bio,
+      });
+
+      console.log('✅ User profile updated successfully');
+    } catch (error) {
+      console.error('❌ Failed to update user profile:', error);
+      throw error;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
@@ -478,6 +618,16 @@ function App() {
         <SignInModal isOpen={!isSignedIn} />
       )}
       
+      {/* Loading User Profile Modal - Shows while user profile is being synced */}
+      {!isSignedIn &&isLoadingUserProfile && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-card border-2 border-border rounded-lg p-8 flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="text-lg font-mono uppercase tracking-wider text-center">Loading Profile...</p>
+          </div>
+        </div>
+      )}
+      
       {/* Mobile Header */}
       <MobileHeader mockData={mockData} />
 
@@ -488,75 +638,109 @@ function App() {
           <DashboardSidebar
             channels={channels}
             activeChannelId={activeChannelId}
-            onChannelSelect={handleChannelSelect}
-            onNewChat={handleNewChat}
+            onChannelSelect={(id) => {
+              handleChannelSelect(id);
+              setCurrentView('chat');
+            }}
+            onNewChat={() => {
+              handleNewChat();
+              setCurrentView('chat');
+            }}
             isCreatingChannel={isCreatingChannel}
-            userEmail={userEmail}
+            userProfile={userProfile}
             onSignOut={signOut}
+            onAccountClick={() => setCurrentView('account')}
+            onSettingsClick={() => setCurrentView('settings')}
+            onHomeClick={() => setCurrentView('chat')}
           />
-                </div>
+        </div>
 
-        {/* Center - Chat Interface */}
+        {/* Center - Chat Interface / Account / Settings */}
         <div className="col-span-1 lg:col-span-7">
-          <div className="flex flex-col relative w-full gap-1 min-h-full">
-      {/* Header */}
-            <div className="flex items-center lg:items-baseline gap-2.5 md:gap-4 px-4 md:px-6 py-3 md:pb-4 lg:pt-7 ring-2 ring-pop sticky top-header-mobile lg:top-0 bg-background z-10">
-              {(agent as any)?.settings?.avatar ? (
-                <div className="rounded size-7 md:size-9 overflow-hidden flex-shrink-0 my-auto">
-                  <img 
-                    src={(agent as any).settings.avatar as string} 
-                    alt={agent?.name || 'Agent'}
-                    className="w-full h-full object-cover"
-                  />
+          {currentView === 'account' ? (
+            <AccountPage 
+              totalBalance={totalBalance} 
+              userProfile={userProfile}
+              onUpdateProfile={updateUserProfile}
+            />
+          ) : currentView === 'settings' ? (
+            <div className="flex flex-col relative w-full gap-1 min-h-full">
+              <div className="flex items-center lg:items-baseline gap-2.5 md:gap-4 px-4 md:px-6 py-3 md:pb-4 lg:pt-7 ring-2 ring-pop sticky top-header-mobile lg:top-0 bg-background z-10">
+                <h1 className="text-xl lg:text-4xl font-display leading-[1] mb-1">
+                  Settings
+                </h1>
+                <span className="ml-auto text-xs md:text-sm text-muted-foreground block uppercase">
+                  Coming Soon
+                </span>
+              </div>
+              <div className="min-h-full flex-1 flex items-center justify-center ring-2 ring-pop bg-background">
+                <div className="text-center text-muted-foreground">
+                  <h2 className="text-2xl font-bold mb-2">Settings</h2>
+                  <p>Coming soon...</p>
                 </div>
-              ) : (
-                <div className="rounded bg-primary size-7 md:size-9 flex items-center justify-center my-auto flex-shrink-0">
-                  <MessageSquare className="opacity-50 md:opacity-100 size-4 md:size-5" />
-                </div>
-              )}
-              <h1 className="text-xl lg:text-4xl font-display leading-[1] mb-1">
-                Agent
-              </h1>
-              <span className="ml-auto text-xs md:text-sm text-muted-foreground block uppercase">
-                Powered by ElizaOS
-              </span>
+              </div>
             </div>
-            
-            {/* Content Area */}
-            <div className="min-h-full flex-1 flex flex-col gap-8 md:gap-14 px-3 lg:px-6 py-6 md:py-10 ring-2 ring-pop bg-background">
-              {!userId || !connected || isLoadingChannels || !activeChannelId ? (
-                <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-4 text-muted-foreground uppercase tracking-wider text-sm font-mono">
-                      {!isInitialized && import.meta.env.VITE_CDP_PROJECT_ID ? 'Initializing wallet...' :
-                       !userId ? 'Initializing user...' : 
-                       !connected ? 'Connecting to server...' :
-                       isLoadingChannels ? 'Loading channels...' : 
-                       'Select a chat'}
-                    </p>
+          ) : (
+            <div className="flex flex-col relative w-full gap-1 min-h-full">
+              {/* Header */}
+              <div className="flex items-center lg:items-baseline gap-2.5 md:gap-4 px-4 md:px-6 py-3 md:pb-4 lg:pt-7 ring-2 ring-pop sticky top-header-mobile lg:top-0 bg-background z-10">
+                {(agent as any)?.settings?.avatar ? (
+                  <div className="rounded size-7 md:size-9 overflow-hidden flex-shrink-0 my-auto">
+                    <img 
+                      src={(agent as any).settings.avatar as string} 
+                      alt={agent?.name || 'Agent'}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                </div>
-              ) : (
-                <ChatInterface
-                  agent={agent}
-                  userId={userId}
-                  serverId={userId} // Use userId as serverId for Socket.IO-level isolation
-                  channelId={activeChannelId}
-                />
-              )}
+                ) : (
+                  <div className="rounded bg-primary size-7 md:size-9 flex items-center justify-center my-auto flex-shrink-0">
+                    <MessageSquare className="opacity-50 md:opacity-100 size-4 md:size-5" />
+                  </div>
+                )}
+                <h1 className="text-xl lg:text-4xl font-display leading-[1] mb-1">
+                  Agent
+                </h1>
+                <span className="ml-auto text-xs md:text-sm text-muted-foreground block uppercase">
+                    Powered by ElizaOS
+                </span>
+              </div>
+              
+              {/* Content Area */}
+              <div className="min-h-full flex-1 flex flex-col gap-8 md:gap-14 px-3 lg:px-6 py-6 md:py-10 ring-2 ring-pop bg-background">
+                {!userId || !connected || isLoadingChannels || !activeChannelId ? (
+                  <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                      <p className="mt-4 text-muted-foreground uppercase tracking-wider text-sm font-mono">
+                        {!isInitialized && import.meta.env.VITE_CDP_PROJECT_ID ? 'Initializing wallet...' :
+                         !userId ? 'Initializing user...' : 
+                         !connected ? 'Connecting to server...' :
+                         isLoadingChannels ? 'Loading channels...' : 
+                         'Select a chat'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <ChatInterface
+                    agent={agent}
+                    userId={userId}
+                    serverId={userId} // Use userId as serverId for Socket.IO-level isolation
+                    channelId={activeChannelId}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Sidebar - Widget & CDP Wallet */}
         <div className="col-span-3 hidden lg:block">
           <div className="space-y-gap py-sides min-h-screen max-h-screen sticky top-0 overflow-clip">
             <Widget widgetData={mockData.widgetData} />
-            <CDPWalletCard />
+            <CDPWalletCard onBalanceChange={setTotalBalance} />
           </div>
-            </div>
-          </div>
+        </div>
+      </div>
     </SidebarProvider>
   );
 }

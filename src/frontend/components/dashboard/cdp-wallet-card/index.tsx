@@ -117,6 +117,10 @@ interface TokenInfo {
   icon?: string;
 }
 
+interface CDPWalletCardProps {
+  onBalanceChange?: (balance: number) => void;
+}
+
 /**
  * CDP Wallet Card Component
  * 
@@ -128,7 +132,7 @@ interface TokenInfo {
  * - Fund wallet with Coinbase Pay
  * - Sign out functionality
  */
-export function CDPWalletCard() {
+export function CDPWalletCard({ onBalanceChange }: CDPWalletCardProps = {}) {
   // Use custom CDP wallet hook for centralized wallet state
   const { isInitialized, isSignedIn, evmAddress, signOut } = useCDPWallet();
 
@@ -741,6 +745,16 @@ export function CDPWalletCard() {
     startAutoRefresh();
   }, [fetchTokenBalances, fetchTransactionHistory, fetchNFTs, activeTab, startAutoRefresh]);
 
+  // Calculate total portfolio value in USD (must be before conditional returns)
+  const totalUsdValue = tokens.reduce((sum, token) => sum + token.usdValue, 0);
+
+  // Notify parent of balance changes (must be before conditional returns)
+  useEffect(() => {
+    if (onBalanceChange) {
+      onBalanceChange(totalUsdValue);
+    }
+  }, [totalUsdValue, onBalanceChange]);
+
   // Handle copy address
   const handleCopyAddress = async () => {
     if (!evmAddress) return;
@@ -754,6 +768,20 @@ export function CDPWalletCard() {
       setError('Failed to copy address');
     }
   };
+
+  // Handle sign out with error handling
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      console.log("CDP wallet signed out successfully");
+    } catch (err: any) {
+      console.error("Sign out failed:", err);
+      setError(err.message || 'Sign out failed');
+    }
+  };
+
+  // Format address for display (shortened)
+  const shortAddress = evmAddress ? `${evmAddress.slice(0, 6)}...${evmAddress.slice(-4)}` : '';
 
   // Show loading state while CDP is initializing
   if (!isInitialized) {
@@ -770,23 +798,6 @@ export function CDPWalletCard() {
       </Card>
     );
   }
-
-  // Handle sign out with error handling
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      console.log("CDP wallet signed out successfully");
-    } catch (err: any) {
-      console.error("Sign out failed:", err);
-      setError(err.message || 'Sign out failed');
-    }
-  };
-
-  // Calculate total portfolio value in USD
-  const totalUsdValue = tokens.reduce((sum, token) => sum + token.usdValue, 0);
-
-  // Format address for display (shortened)
-  const shortAddress = evmAddress ? `${evmAddress.slice(0, 6)}...${evmAddress.slice(-4)}` : '';
 
   // Show connected state with wallet info
   if (isSignedIn && evmAddress) {

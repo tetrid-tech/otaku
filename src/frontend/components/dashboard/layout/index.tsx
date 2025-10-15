@@ -24,7 +24,7 @@ export default function DashboardPageLayout({
           {header.title}
         </h1>
         {header.description && (
-          <span className="ml-auto text-xs md:text-sm text-muted-foreground block">
+          <span className="ml-auto text-xs md:text-sm text-muted-foreground block uppercase">
             {header.description}
           </span>
         )}

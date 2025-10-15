@@ -16,6 +16,7 @@ import { audioRouter } from './audio';
 import { runtimeRouter } from './runtime';
 import { teeRouter } from './tee';
 import { systemRouter } from './system';
+import { entitiesRouter } from './entities';
 // NOTE: world router has been removed - functionality moved to messaging/spaces
 import { SocketIORouter } from '../socketio';
 import {
@@ -381,6 +382,9 @@ export function createApiRouter(
 
   // Mount memory router at /memory - handles agent memory storage and retrieval
   router.use('/memory', memoryRouter(elizaOS, serverInstance));
+
+  // Mount entities router at /entities - handles entity CRUD operations
+  router.use('/entities', entitiesRouter(serverInstance));
 
   // Mount audio router at /audio - handles audio processing, transcription, and voice operations
   router.use('/audio', audioRouter(elizaOS));
