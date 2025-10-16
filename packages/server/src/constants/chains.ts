@@ -295,3 +295,69 @@ export function getSwapSupportedNetworks(): SupportedNetwork[] {
   });
 }
 
+// ============================================================================
+// Swap Protocol Constants
+// ============================================================================
+
+/**
+ * Native token address used by swap protocols (0x + Ee repeated)
+ * This special address represents native tokens (ETH, MATIC, etc.) in swap protocols
+ */
+export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+
+/**
+ * Normalize token address for swap protocols
+ * If the token address is not a valid contract address (0x...), treat it as native token
+ */
+export function normalizeTokenAddress(token: string): string {
+  // Check if it's already a valid contract address (0x followed by 40 hex chars)
+  if (/^0x[a-fA-F0-9]{40}$/.test(token)) {
+    return token;
+  }
+  // Otherwise, treat it as native token
+  return NATIVE_TOKEN_ADDRESS;
+}
+
+/**
+ * Uniswap V3 SwapRouter addresses per network
+ */
+export const UNISWAP_V3_ROUTER: Record<string, string> = {
+  'ethereum': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+  'polygon': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+  'arbitrum': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+  'optimism': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+  'base': '0x2626664c2603336E57B271c5C0b26F421741e481',
+};
+
+/**
+ * Uniswap V3 Quoter V2 addresses per network
+ */
+export const UNISWAP_V3_QUOTER: Record<string, string> = {
+  'ethereum': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  'polygon': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  'arbitrum': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  'optimism': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+  'base': '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+};
+
+/**
+ * Wrapped native token addresses per network
+ * Uniswap V3 requires wrapped tokens for native currency swaps
+ */
+export const WRAPPED_NATIVE_TOKEN: Record<string, string> = {
+  'ethereum': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+  'polygon': '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',  // WMATIC
+  'arbitrum': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', // WETH
+  'optimism': '0x4200000000000000000000000000000000000006', // WETH
+  'base': '0x4200000000000000000000000000000000000006',     // WETH
+};
+
+/**
+ * Uniswap V3 pool fee tiers (in hundredths of a bip, i.e. 1e-6)
+ */
+export const UNISWAP_POOL_FEES = {
+  LOW: 500,      // 0.05%
+  MEDIUM: 3000,  // 0.3%
+  HIGH: 10000,   // 1%
+};
+

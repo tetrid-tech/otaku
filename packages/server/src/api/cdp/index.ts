@@ -11,67 +11,13 @@ import {
   getViemChain,
   getRpcUrl,
   isCdpSwapSupported,
+  NATIVE_TOKEN_ADDRESS,
+  normalizeTokenAddress,
+  UNISWAP_V3_ROUTER,
+  UNISWAP_V3_QUOTER,
+  WRAPPED_NATIVE_TOKEN,
+  UNISWAP_POOL_FEES,
 } from '../../constants/chains';
-
-// Native token address used by swap protocols (0x + Ee repeated)
-// This special address represents native tokens (ETH, MATIC, etc.) in swap protocols
-export const NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-
-/**
- * Normalize token address for swap protocols
- * If the token address is not a valid contract address (0x...), treat it as native token
- */
-function normalizeTokenAddress(token: string): string {
-  // Check if it's already a valid contract address (0x followed by 40 hex chars)
-  if (/^0x[a-fA-F0-9]{40}$/.test(token)) {
-    return token;
-  }
-  // Otherwise, treat it as native token
-  return NATIVE_TOKEN_ADDRESS;
-}
-
-/**
- * Uniswap V3 SwapRouter addresses per network
- */
-const UNISWAP_V3_ROUTER: Record<string, string> = {
-  'ethereum': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-  'polygon': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-  'arbitrum': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-  'optimism': '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-  'base': '0x2626664c2603336E57B271c5C0b26F421741e481',
-};
-
-/**
- * Uniswap V3 Quoter V2 addresses per network
- */
-const UNISWAP_V3_QUOTER: Record<string, string> = {
-  'ethereum': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
-  'polygon': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
-  'arbitrum': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
-  'optimism': '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
-  'base': '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
-};
-
-/**
- * Wrapped native token addresses per network
- * Uniswap V3 requires wrapped tokens for native currency swaps
- */
-const WRAPPED_NATIVE_TOKEN: Record<string, string> = {
-  'ethereum': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
-  'polygon': '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',  // WMATIC
-  'arbitrum': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', // WETH
-  'optimism': '0x4200000000000000000000000000000000000006', // WETH
-  'base': '0x4200000000000000000000000000000000000006',     // WETH
-};
-
-/**
- * Uniswap V3 pool fee tiers (in hundredths of a bip, i.e. 1e-6)
- */
-const UNISWAP_POOL_FEES = {
-  LOW: 500,      // 0.05%
-  MEDIUM: 3000,  // 0.3%
-  HIGH: 10000,   // 1%
-};
 
 /**
  * Check if a token needs approval and approve if necessary
@@ -146,6 +92,541 @@ async function ensureTokenApproval(
   // Wait for approval transaction
   await publicClient.waitForTransactionReceipt({ hash });
   logger.info(`[CDP API] Token approval successful: ${hash}`);
+}
+
+/**
+ * Wrap native token (ETH -> WETH, MATIC -> WMATIC, etc.)
+ */
+async function wrapNativeToken(
+  walletClient: any,
+  publicClient: any,
+  wrappedTokenAddress: string,
+  amount: bigint
+): Promise<string> {
+  logger.info(`[CDP API] Wrapping native token: ${amount.toString()}`);
+  
+  const wethAbi = [
+    {
+      name: 'deposit',
+      type: 'function',
+      stateMutability: 'payable',
+      inputs: [],
+      outputs: []
+    }
+  ] as const;
+
+  const hash = await walletClient.writeContract({
+    address: wrappedTokenAddress as `0x${string}`,
+    abi: wethAbi,
+    functionName: 'deposit',
+    value: amount,
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash });
+  logger.info(`[CDP API] Native token wrapped successfully: ${hash}`);
+  return hash;
+}
+
+/**
+ * Unwrap native token (WETH -> ETH, WMATIC -> MATIC, etc.)
+ */
+async function unwrapNativeToken(
+  walletClient: any,
+  publicClient: any,
+  wrappedTokenAddress: string,
+  ownerAddress: string
+): Promise<{ hash: string; amount: bigint }> {
+  logger.info(`[CDP API] Unwrapping native token`);
+  
+  // Get wrapped token balance
+  const balanceAbi = [
+    {
+      name: 'balanceOf',
+      type: 'function',
+      stateMutability: 'view',
+      inputs: [{ name: 'account', type: 'address' }],
+      outputs: [{ name: '', type: 'uint256' }]
+    }
+  ] as const;
+
+  const wrappedBalance = await publicClient.readContract({
+    address: wrappedTokenAddress as `0x${string}`,
+    abi: balanceAbi,
+    functionName: 'balanceOf',
+    args: [ownerAddress as `0x${string}`],
+  });
+
+  if (wrappedBalance === 0n) {
+    logger.warn(`[CDP API] No wrapped tokens to unwrap`);
+    return { hash: '', amount: 0n };
+  }
+
+  // Withdraw
+  const wethWithdrawAbi = [
+    {
+      name: 'withdraw',
+      type: 'function',
+      stateMutability: 'nonpayable',
+      inputs: [{ name: 'amount', type: 'uint256' }],
+      outputs: []
+    }
+  ] as const;
+
+  const hash = await walletClient.writeContract({
+    address: wrappedTokenAddress as `0x${string}`,
+    abi: wethWithdrawAbi,
+    functionName: 'withdraw',
+    args: [wrappedBalance],
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash });
+  logger.info(`[CDP API] Unwrapped ${wrappedBalance.toString()} to native token: ${hash}`);
+  
+  return { hash, amount: wrappedBalance };
+}
+
+/**
+ * Get quote from Uniswap V3 Quoter
+ * Tries MEDIUM, LOW, then HIGH fee tiers
+ * @throws Error if no liquidity pool exists for any fee tier
+ */
+async function getUniswapQuote(
+  publicClient: any,
+  quoterAddress: string,
+  tokenIn: string,
+  tokenOut: string,
+  amountIn: bigint
+): Promise<{ amountOut: bigint; fee: number }> {
+  const quoterAbi = [
+    {
+      name: 'quoteExactInputSingle',
+      type: 'function',
+      stateMutability: 'nonpayable',
+      inputs: [
+        {
+          name: 'params',
+          type: 'tuple',
+          components: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'fee', type: 'uint24' },
+            { name: 'sqrtPriceLimitX96', type: 'uint160' }
+          ]
+        }
+      ],
+      outputs: [
+        { name: 'amountOut', type: 'uint256' },
+        { name: 'sqrtPriceX96After', type: 'uint160' },
+        { name: 'initializedTicksCrossed', type: 'uint32' },
+        { name: 'gasEstimate', type: 'uint256' }
+      ]
+    }
+  ] as const;
+
+  const quoteParams = {
+    tokenIn: tokenIn as `0x${string}`,
+    tokenOut: tokenOut as `0x${string}`,
+    amountIn,
+    fee: UNISWAP_POOL_FEES.MEDIUM,
+    sqrtPriceLimitX96: 0n,
+  };
+
+  const errors: string[] = [];
+
+  // Try MEDIUM fee tier first
+  try {
+    const quoteResult = await publicClient.simulateContract({
+      address: quoterAddress as `0x${string}`,
+      abi: quoterAbi,
+      functionName: 'quoteExactInputSingle',
+      args: [quoteParams],
+    });
+    const amountOut = quoteResult.result[0];
+    logger.info(`[CDP API] Uniswap quote (MEDIUM fee 0.3%): ${amountOut.toString()}`);
+    return { amountOut, fee: UNISWAP_POOL_FEES.MEDIUM };
+  } catch (mediumError) {
+    const errMsg = mediumError instanceof Error ? mediumError.message : String(mediumError);
+    errors.push(`MEDIUM(0.3%): ${errMsg.substring(0, 100)}`);
+    logger.debug(`[CDP API] MEDIUM fee tier failed, trying LOW`);
+  }
+
+  // Try LOW fee tier
+  quoteParams.fee = UNISWAP_POOL_FEES.LOW;
+  try {
+    const quoteResult = await publicClient.simulateContract({
+      address: quoterAddress as `0x${string}`,
+      abi: quoterAbi,
+      functionName: 'quoteExactInputSingle',
+      args: [quoteParams],
+    });
+    const amountOut = quoteResult.result[0];
+    logger.info(`[CDP API] Uniswap quote (LOW fee 0.05%): ${amountOut.toString()}`);
+    return { amountOut, fee: UNISWAP_POOL_FEES.LOW };
+  } catch (lowError) {
+    const errMsg = lowError instanceof Error ? lowError.message : String(lowError);
+    errors.push(`LOW(0.05%): ${errMsg.substring(0, 100)}`);
+    logger.debug(`[CDP API] LOW fee tier failed, trying HIGH`);
+  }
+
+  // Try HIGH fee tier as last resort
+  quoteParams.fee = UNISWAP_POOL_FEES.HIGH;
+  try {
+    const quoteResult = await publicClient.simulateContract({
+      address: quoterAddress as `0x${string}`,
+      abi: quoterAbi,
+      functionName: 'quoteExactInputSingle',
+      args: [quoteParams],
+    });
+    const amountOut = quoteResult.result[0];
+    logger.info(`[CDP API] Uniswap quote (HIGH fee 1%): ${amountOut.toString()}`);
+    return { amountOut, fee: UNISWAP_POOL_FEES.HIGH };
+  } catch (highError) {
+    const errMsg = highError instanceof Error ? highError.message : String(highError);
+    errors.push(`HIGH(1%): ${errMsg.substring(0, 100)}`);
+  }
+
+  // All fee tiers failed - no liquidity pool exists
+  logger.warn(`[CDP API] No Uniswap V3 liquidity pool found for token pair ${tokenIn} -> ${tokenOut}`);
+  throw new Error(`No Uniswap V3 liquidity pool exists for this token pair. This pair is not tradeable on Uniswap V3 on this network.`);
+}
+
+/**
+ * Get swap quote from 0x API v2
+ */
+async function get0xQuote(
+  network: string,
+  fromToken: string,
+  toToken: string,
+  fromAmount: bigint,
+  takerAddress: string
+): Promise<{ toAmount: string; data?: any } | null> {
+  const apiKey = process.env.OX_API_KEY;
+  if (!apiKey) {
+    logger.debug('[CDP API] 0x API key not configured');
+    return null;
+  }
+
+  try {
+    // 0x uses 0xeee...eee for native token
+    const normalizedFromToken = normalizeTokenAddress(fromToken);
+    const normalizedToToken = normalizeTokenAddress(toToken);
+
+    // Map network names to chain IDs
+    const chainIdMap: Record<string, string> = {
+      'ethereum': '1',
+      'polygon': '137',
+      'arbitrum': '42161',
+      'optimism': '10',
+      'base': '8453',
+    };
+
+    const chainId = chainIdMap[network];
+    if (!chainId) {
+      logger.debug(`[CDP API] 0x API not available for network: ${network}`);
+      return null;
+    }
+
+    // 0x API v2 uses AllowanceHolder flow (simpler, single signature)
+    const params = new URLSearchParams({
+      chainId,
+      sellToken: normalizedFromToken,
+      buyToken: normalizedToToken,
+      sellAmount: fromAmount.toString(),
+      taker: takerAddress,
+    });
+
+    const url = `https://api.0x.org/swap/allowance-holder/price?${params.toString()}`;
+    
+    logger.info(`[CDP API] Fetching 0x v2 price quote for ${network} (chainId: ${chainId})`);
+    const response = await fetch(url, {
+      headers: {
+        '0x-api-key': apiKey,
+        '0x-version': 'v2',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn(`[CDP API] 0x API v2 error (${response.status}): ${errorText.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (!data.buyAmount) {
+      logger.warn('[CDP API] 0x API v2 returned no buyAmount');
+      return null;
+    }
+
+    logger.info(`[CDP API] 0x v2 quote successful: ${data.buyAmount} tokens expected`);
+    return {
+      toAmount: data.buyAmount,
+      data, // Full response for executing swap
+    };
+  } catch (error) {
+    logger.warn('[CDP API] 0x API v2 request failed:', error instanceof Error ? error.message : String(error));
+    return null;
+  }
+}
+
+/**
+ * Execute swap using 0x API v2
+ */
+async function execute0xSwap(
+  walletClient: any,
+  publicClient: any,
+  account: any,
+  network: string,
+  fromToken: string,
+  toToken: string,
+  fromAmount: bigint,
+  slippageBps: number
+): Promise<{ transactionHash: string; toAmount: string }> {
+  const apiKey = process.env.OX_API_KEY;
+  if (!apiKey) {
+    throw new Error('0x API key not configured');
+  }
+
+  const normalizedFromToken = normalizeTokenAddress(fromToken);
+  const normalizedToToken = normalizeTokenAddress(toToken);
+
+  // Map network names to chain IDs
+  const chainIdMap: Record<string, string> = {
+    'ethereum': '1',
+    'polygon': '137',
+    'arbitrum': '42161',
+    'optimism': '10',
+    'base': '8453',
+  };
+
+  const chainId = chainIdMap[network];
+  if (!chainId) {
+    throw new Error(`0x API not available for network: ${network}`);
+  }
+
+  // Convert slippageBps to basis points for v2 API (e.g., 100 bps stays as 100)
+  const slippageBps_param = slippageBps;
+
+  // 0x API v2 uses AllowanceHolder flow with slippageBps parameter
+  const params = new URLSearchParams({
+    chainId,
+    sellToken: normalizedFromToken,
+    buyToken: normalizedToToken,
+    sellAmount: fromAmount.toString(),
+    taker: account.address,
+    slippageBps: slippageBps_param.toString(),
+  });
+
+  const url = `https://api.0x.org/swap/allowance-holder/quote?${params.toString()}`;
+  
+  logger.info(`[CDP API] Fetching 0x v2 swap quote with ${slippageBps}bps slippage (chainId: ${chainId})`);
+  const response = await fetch(url, {
+    headers: {
+      '0x-api-key': apiKey,
+      '0x-version': 'v2',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`0x API v2 error (${response.status}): ${errorText.substring(0, 200)}`);
+  }
+
+  const quote = await response.json();
+
+  if (!quote.transaction || !quote.transaction.to || !quote.transaction.data || !quote.buyAmount) {
+    throw new Error('Invalid 0x API v2 response');
+  }
+
+  const tx = quote.transaction;
+
+  // Approve token if needed (for ERC20 tokens)
+  // v2 uses allowanceTarget field for the approval spender
+  if (normalizedFromToken !== NATIVE_TOKEN_ADDRESS && quote.issues?.allowance) {
+    const spender = quote.issues.allowance.spender || tx.to;
+    await ensureTokenApproval(
+      walletClient,
+      publicClient,
+      normalizedFromToken,
+      spender,
+      fromAmount,
+      account.address
+    );
+  }
+
+  // Execute the swap
+  logger.info(`[CDP API] Executing 0x v2 swap transaction`);
+  const value = normalizedFromToken === NATIVE_TOKEN_ADDRESS ? fromAmount : (tx.value ? BigInt(tx.value) : 0n);
+  
+  // Build transaction parameters
+  // Note: We don't include gas pricing parameters (gasPrice, maxFeePerGas, etc.)
+  // Let viem auto-estimate them based on the current chain
+  // This prevents "Malformed unsigned EIP-1559 transaction" errors on EIP-1559 chains
+  const txParams: any = {
+    to: tx.to as `0x${string}`,
+    data: tx.data as `0x${string}`,
+    value,
+    chain: walletClient.chain,
+  };
+
+  // Only include gas limit if provided
+  if (tx.gas) {
+    txParams.gas = BigInt(tx.gas);
+  }
+
+  // Don't include gasPrice or EIP-1559 params - let viem handle it
+  // 0x API may return gasPrice but it conflicts with EIP-1559 chains
+
+  const hash = await walletClient.sendTransaction(txParams);
+
+  await publicClient.waitForTransactionReceipt({ hash });
+  logger.info(`[CDP API] 0x v2 swap successful: ${hash}`);
+
+  return {
+    transactionHash: hash,
+    toAmount: quote.buyAmount,
+  };
+}
+
+/**
+ * Execute Uniswap V3 swap
+ */
+async function executeUniswapSwap(
+  walletClient: any,
+  publicClient: any,
+  account: any,
+  network: string,
+  fromToken: string,
+  toToken: string,
+  fromAmount: bigint,
+  slippageBps: number
+): Promise<{ transactionHash: string; toAmount: string }> {
+  const routerAddress = UNISWAP_V3_ROUTER[network];
+  if (!routerAddress) {
+    throw new Error(`Uniswap V3 not available on network: ${network}`);
+  }
+
+  const quoterAddress = UNISWAP_V3_QUOTER[network];
+  if (!quoterAddress) {
+    throw new Error(`Uniswap V3 Quoter not available on network: ${network}`);
+  }
+
+  const wrappedNativeAddress = WRAPPED_NATIVE_TOKEN[network];
+  if (!wrappedNativeAddress) {
+    throw new Error(`Wrapped native token not configured for network: ${network}`);
+  }
+
+  // Normalize token addresses
+  const normalizedFromToken = normalizeTokenAddress(fromToken);
+  const normalizedToToken = normalizeTokenAddress(toToken);
+
+  const isFromNative = normalizedFromToken === NATIVE_TOKEN_ADDRESS;
+  const isToNative = normalizedToToken === NATIVE_TOKEN_ADDRESS;
+
+  const uniswapFromToken = isFromNative ? wrappedNativeAddress : normalizedFromToken;
+  const uniswapToToken = isToNative ? wrappedNativeAddress : normalizedToToken;
+
+  logger.debug(`[CDP API] Uniswap tokens: ${uniswapFromToken} -> ${uniswapToToken}`);
+
+  // If swapping FROM native token, wrap it first
+  if (isFromNative) {
+    await wrapNativeToken(walletClient, publicClient, wrappedNativeAddress, fromAmount);
+  }
+
+  // Approve token if needed
+  await ensureTokenApproval(
+    walletClient,
+    publicClient,
+    uniswapFromToken,
+    routerAddress,
+    fromAmount,
+    account.address
+  );
+
+  // Get quote for slippage calculation
+  logger.info(`[CDP API] Getting Uniswap quote for slippage calculation`);
+  const { amountOut: expectedAmountOut, fee } = await getUniswapQuote(
+    publicClient,
+    quoterAddress,
+    uniswapFromToken,
+    uniswapToToken,
+    fromAmount
+  );
+
+  // Calculate minimum amount out based on slippage tolerance
+  const minAmountOut = (expectedAmountOut * BigInt(10000 - slippageBps)) / BigInt(10000);
+  logger.info(`[CDP API] Slippage protection: expected=${expectedAmountOut.toString()}, min=${minAmountOut.toString()} (${slippageBps}bps)`);
+
+  // Prepare and execute swap
+  const swapRouterAbi = [
+    {
+      name: 'exactInputSingle',
+      type: 'function',
+      stateMutability: 'payable',
+      inputs: [
+        {
+          name: 'params',
+          type: 'tuple',
+          components: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'fee', type: 'uint24' },
+            { name: 'recipient', type: 'address' },
+            { name: 'deadline', type: 'uint256' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'amountOutMinimum', type: 'uint256' },
+            { name: 'sqrtPriceLimitX96', type: 'uint160' }
+          ]
+        }
+      ],
+      outputs: [{ name: 'amountOut', type: 'uint256' }]
+    }
+  ] as const;
+
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20); // 20 minutes
+  const swapParams = {
+    tokenIn: uniswapFromToken as `0x${string}`,
+    tokenOut: uniswapToToken as `0x${string}`,
+    fee,
+    recipient: account.address as `0x${string}`,
+    deadline,
+    amountIn: fromAmount,
+    amountOutMinimum: minAmountOut,
+    sqrtPriceLimitX96: 0n,
+  };
+
+  const { encodeFunctionData } = await import('viem');
+  const data = encodeFunctionData({
+    abi: swapRouterAbi,
+    functionName: 'exactInputSingle',
+    args: [swapParams],
+  });
+
+  const hash = await walletClient.sendTransaction({
+    to: routerAddress as `0x${string}`,
+    data,
+    value: 0n,
+    chain: walletClient.chain,
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash });
+  logger.info(`[CDP API] Uniswap V3 swap successful: ${hash}`);
+
+  let finalAmount = expectedAmountOut.toString();
+
+  // If swapping TO native token, unwrap it
+  if (isToNative) {
+    const { amount } = await unwrapNativeToken(walletClient, publicClient, wrappedNativeAddress, account.address);
+    if (amount > 0n) {
+      finalAmount = amount.toString();
+    }
+  }
+
+  return {
+    transactionHash: hash,
+    toAmount: finalAmount,
+  };
 }
 
 // Singleton CDP client instance
@@ -1142,8 +1623,22 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
           minToAmount: (swapPrice as any).minToAmount?.toString() || '0',
         };
       } else {
-        // Non-CDP networks: Use Uniswap V3 Quoter for price estimation
-        logger.info(`[CDP API] Using Uniswap V3 Quoter for price estimation on ${network}`);
+        // Non-CDP networks: Try 0x API first, then fall back to Uniswap V3
+        logger.info(`[CDP API] Using 0x API / Uniswap V3 for price estimation on ${network}`);
+        
+        // Try 0x API first
+        const zeroXQuote = await get0xQuote(network, fromToken, toToken, BigInt(fromAmount), account.address);
+        
+        if (zeroXQuote) {
+          logger.info(`[CDP API] Using 0x API quote`);
+          swapPriceResult = {
+            liquidityAvailable: true,
+            toAmount: zeroXQuote.toAmount,
+            minToAmount: zeroXQuote.toAmount, // Will be calculated with actual slippage during swap
+          };
+        } else {
+          // Fall back to Uniswap V3
+          logger.info(`[CDP API] 0x API unavailable, falling back to Uniswap V3`);
         
         const quoterAddress = UNISWAP_V3_QUOTER[network];
         if (!quoterAddress) {
@@ -1188,109 +1683,29 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
           const uniswapFromToken = isFromNative ? wrappedNativeAddress : normalizedFromToken;
           const uniswapToToken = isToNative ? wrappedNativeAddress : normalizedToToken;
 
-          // QuoterV2 ABI for quoteExactInputSingle
-          const quoterAbi = [
-            {
-              name: 'quoteExactInputSingle',
-              type: 'function',
-              stateMutability: 'nonpayable',
-              inputs: [
-                {
-                  name: 'params',
-                  type: 'tuple',
-                  components: [
-                    { name: 'tokenIn', type: 'address' },
-                    { name: 'tokenOut', type: 'address' },
-                    { name: 'amountIn', type: 'uint256' },
-                    { name: 'fee', type: 'uint24' },
-                    { name: 'sqrtPriceLimitX96', type: 'uint160' }
-                  ]
-                }
-              ],
-              outputs: [
-                { name: 'amountOut', type: 'uint256' },
-                { name: 'sqrtPriceX96After', type: 'uint160' },
-                { name: 'initializedTicksCrossed', type: 'uint32' },
-                { name: 'gasEstimate', type: 'uint256' }
-              ]
-            }
-          ] as const;
-
-          const quoteParams = {
-            tokenIn: uniswapFromToken as `0x${string}`,
-            tokenOut: uniswapToToken as `0x${string}`,
-            amountIn: BigInt(fromAmount),
-            fee: UNISWAP_POOL_FEES.MEDIUM,
-            sqrtPriceLimitX96: 0n,
-          };
-
-          let expectedAmountOut: bigint;
-          let liquidityAvailable = false;
-          
-          try {
-            const quoteResult = await publicClient.simulateContract({
-              address: quoterAddress as `0x${string}`,
-              abi: quoterAbi,
-              functionName: 'quoteExactInputSingle',
-              args: [quoteParams],
-            });
-            expectedAmountOut = quoteResult.result[0];
-            liquidityAvailable = true;
-            logger.info(`[CDP API] Uniswap quote result: ${expectedAmountOut.toString()} tokens expected`);
-          } catch (quoteError) {
-            logger.debug(`[CDP API] Failed to get quote, trying LOW fee tier:`, quoteError instanceof Error ? quoteError.message : String(quoteError));
-            
-            // Try LOW fee tier as fallback
-            quoteParams.fee = UNISWAP_POOL_FEES.LOW;
             try {
-              const quoteResult = await publicClient.simulateContract({
-                address: quoterAddress as `0x${string}`,
-                abi: quoterAbi,
-                functionName: 'quoteExactInputSingle',
-                args: [quoteParams],
-              });
-              expectedAmountOut = quoteResult.result[0];
-              liquidityAvailable = true;
-              logger.info(`[CDP API] Uniswap quote result (LOW fee): ${expectedAmountOut.toString()} tokens expected`);
-            } catch (lowFeeError) {
-              logger.debug(`[CDP API] Failed to get quote with LOW fee, trying HIGH fee tier:`, lowFeeError instanceof Error ? lowFeeError.message : String(lowFeeError));
+              const { amountOut } = await getUniswapQuote(
+                publicClient,
+                quoterAddress,
+                uniswapFromToken,
+                uniswapToToken,
+                BigInt(fromAmount)
+              );
               
-              // Try HIGH fee tier as last resort
-              quoteParams.fee = UNISWAP_POOL_FEES.HIGH;
-              try {
-                const quoteResult = await publicClient.simulateContract({
-                  address: quoterAddress as `0x${string}`,
-                  abi: quoterAbi,
-                  functionName: 'quoteExactInputSingle',
-                  args: [quoteParams],
-                });
-                expectedAmountOut = quoteResult.result[0];
-                liquidityAvailable = true;
-                logger.info(`[CDP API] Uniswap quote result (HIGH fee): ${expectedAmountOut.toString()} tokens expected`);
-              } catch (highFeeError) {
-                logger.warn(`[CDP API] All fee tiers failed for Uniswap quote:`, highFeeError instanceof Error ? highFeeError.message : String(highFeeError));
-                expectedAmountOut = 0n;
-              }
-            }
-          }
-
-          if (liquidityAvailable) {
-            // Calculate minimum amount out based on slippage tolerance
-            // slippageBps is passed in the swap request, but for price we'll assume a default
-            // The minToAmount will be calculated during actual swap with user's slippage preference
-            const toAmountStr = expectedAmountOut.toString();
-            
+              const toAmountStr = amountOut.toString();
             swapPriceResult = {
               liquidityAvailable: true,
               toAmount: toAmountStr,
               minToAmount: toAmountStr, // Will be calculated with actual slippage during swap
             };
-          } else {
+            } catch (quoteError) {
+              logger.warn(`[CDP API] Failed to get Uniswap quote:`, quoteError instanceof Error ? quoteError.message : String(quoteError));
             swapPriceResult = {
               liquidityAvailable: false,
               toAmount: '0',
               minToAmount: '0',
             };
+            }
           }
         }
       }
@@ -1451,13 +1866,8 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
           logger.info(`[CDP API] Viem swap successful: ${transactionHash}`);
         }
       } else {
-        // Non-CDP networks: Use Uniswap V3 directly with viem
-        logger.info(`[CDP API] Using Uniswap V3 + viem for swap on ${network}`);
-
-        const routerAddress = UNISWAP_V3_ROUTER[network];
-        if (!routerAddress) {
-          throw new Error(`Uniswap V3 not available on network: ${network}`);
-        }
+        // Non-CDP networks: Try 0x API first, then fall back to Uniswap V3
+        logger.info(`[CDP API] Using 0x API / Uniswap V3 for swap on ${network}`);
 
         const chain = getViemChain(network);
         if (!chain) {
@@ -1474,7 +1884,7 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
           throw new Error(`Could not get RPC URL for network: ${network}`);
         }
 
-        const { createWalletClient, createPublicClient, encodeFunctionData } = await import('viem');
+        const { createWalletClient, createPublicClient } = await import('viem');
         const { toAccount } = await import('viem/accounts');
 
         const walletClient = createWalletClient({
@@ -1488,259 +1898,47 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
           transport: http(rpcUrl),
         });
 
-        // Convert native token addresses to wrapped tokens for Uniswap V3
-        const wrappedNativeAddress = WRAPPED_NATIVE_TOKEN[network];
-        if (!wrappedNativeAddress) {
-          throw new Error(`Wrapped native token not configured for network: ${network}`);
-        }
+        // Try 0x API first
+        try {
+          logger.info(`[CDP API] Attempting swap with 0x API...`);
+          const result = await execute0xSwap(
+            walletClient,
+            publicClient,
+            account,
+            network,
+            fromToken,
+            toToken,
+            BigInt(fromAmount),
+            slippageBps
+          );
 
-        const isFromNative = normalizedFromToken === NATIVE_TOKEN_ADDRESS;
-        const isToNative = normalizedToToken === NATIVE_TOKEN_ADDRESS;
+          transactionHash = result.transactionHash;
+          toAmount = result.toAmount;
+          method = '0x-api';
+          logger.info(`[CDP API] 0x API swap successful`);
+        } catch (zeroXError) {
+          logger.warn(
+            `[CDP API] 0x API swap failed, falling back to Uniswap V3:`,
+            zeroXError instanceof Error ? zeroXError.message : String(zeroXError)
+          );
 
-        const uniswapFromToken = isFromNative ? wrappedNativeAddress : normalizedFromToken;
-        const uniswapToToken = isToNative ? wrappedNativeAddress : normalizedToToken;
-
-        logger.debug(`[CDP API] Uniswap tokens: ${uniswapFromToken} -> ${uniswapToToken}`);
-
-        // If swapping FROM native token, wrap it first
-        if (isFromNative) {
-          logger.info(`[CDP API] Wrapping native token before swap: ${fromAmount}`);
-          
-          // WETH/WMATIC ABI for deposit
-          const wethAbi = [
-            {
-              name: 'deposit',
-              type: 'function',
-              stateMutability: 'payable',
-              inputs: [],
-              outputs: []
-            }
-          ] as const;
-
-          const wrapHash = await walletClient.writeContract({
-            address: wrappedNativeAddress as `0x${string}`,
-            abi: wethAbi,
-            functionName: 'deposit',
-            value: BigInt(fromAmount),
-          });
-
-          await publicClient.waitForTransactionReceipt({ hash: wrapHash });
-          logger.info(`[CDP API] Native token wrapped successfully: ${wrapHash}`);
-        }
-
-        // Handle token approvals if needed (for the wrapped token if we just wrapped, or the original ERC20)
-        await ensureTokenApproval(
+          // Fall back to Uniswap V3
+          logger.info(`[CDP API] Using Uniswap V3 fallback for swap`);
+          const result = await executeUniswapSwap(
           walletClient,
           publicClient,
-          uniswapFromToken,
-          routerAddress,
+            account,
+            network,
+            fromToken,
+            toToken,
           BigInt(fromAmount),
-          account.address
-        );
+            slippageBps
+          );
 
-        // Get quote from Uniswap V3 Quoter to calculate slippage protection
-        logger.info(`[CDP API] Getting quote from Uniswap V3 Quoter for slippage calculation`);
-        
-        const quoterAddress = UNISWAP_V3_QUOTER[network];
-        if (!quoterAddress) {
-          throw new Error(`Uniswap V3 Quoter not available on network: ${network}`);
+          transactionHash = result.transactionHash;
+          toAmount = result.toAmount;
+          method = 'uniswap-v3-viem';
         }
-
-        // QuoterV2 ABI for quoteExactInputSingle
-        const quoterAbi = [
-          {
-            name: 'quoteExactInputSingle',
-            type: 'function',
-            stateMutability: 'nonpayable',
-            inputs: [
-              {
-                name: 'params',
-                type: 'tuple',
-                components: [
-                  { name: 'tokenIn', type: 'address' },
-                  { name: 'tokenOut', type: 'address' },
-                  { name: 'amountIn', type: 'uint256' },
-                  { name: 'fee', type: 'uint24' },
-                  { name: 'sqrtPriceLimitX96', type: 'uint160' }
-                ]
-              }
-            ],
-            outputs: [
-              { name: 'amountOut', type: 'uint256' },
-              { name: 'sqrtPriceX96After', type: 'uint160' },
-              { name: 'initializedTicksCrossed', type: 'uint32' },
-              { name: 'gasEstimate', type: 'uint256' }
-            ]
-          }
-        ] as const;
-
-        const quoteParams = {
-          tokenIn: uniswapFromToken as `0x${string}`,
-          tokenOut: uniswapToToken as `0x${string}`,
-          amountIn: BigInt(fromAmount),
-          fee: UNISWAP_POOL_FEES.MEDIUM,
-          sqrtPriceLimitX96: 0n,
-        };
-
-        let expectedAmountOut: bigint;
-        try {
-          const quoteResult = await publicClient.simulateContract({
-            address: quoterAddress as `0x${string}`,
-            abi: quoterAbi,
-            functionName: 'quoteExactInputSingle',
-            args: [quoteParams],
-          });
-          expectedAmountOut = quoteResult.result[0];
-          logger.info(`[CDP API] Quote result: ${expectedAmountOut.toString()} tokens expected`);
-        } catch (quoteError) {
-          logger.warn(`[CDP API] Failed to get quote, trying LOW fee tier:`, quoteError instanceof Error ? quoteError.message : String(quoteError));
-          
-          // Try LOW fee tier as fallback
-          quoteParams.fee = UNISWAP_POOL_FEES.LOW;
-          try {
-            const quoteResult = await publicClient.simulateContract({
-              address: quoterAddress as `0x${string}`,
-              abi: quoterAbi,
-              functionName: 'quoteExactInputSingle',
-              args: [quoteParams],
-            });
-            expectedAmountOut = quoteResult.result[0];
-            logger.info(`[CDP API] Quote result (LOW fee): ${expectedAmountOut.toString()} tokens expected`);
-          } catch (lowFeeError) {
-            logger.warn(`[CDP API] Failed to get quote with LOW fee, trying HIGH fee tier:`, lowFeeError instanceof Error ? lowFeeError.message : String(lowFeeError));
-            
-            // Try HIGH fee tier as last resort
-            quoteParams.fee = UNISWAP_POOL_FEES.HIGH;
-            const quoteResult = await publicClient.simulateContract({
-              address: quoterAddress as `0x${string}`,
-              abi: quoterAbi,
-              functionName: 'quoteExactInputSingle',
-              args: [quoteParams],
-            });
-            expectedAmountOut = quoteResult.result[0];
-            logger.info(`[CDP API] Quote result (HIGH fee): ${expectedAmountOut.toString()} tokens expected`);
-          }
-        }
-
-        // Calculate minimum amount out based on slippage tolerance
-        // slippageBps is in basis points (e.g., 100 = 1%)
-        // minAmountOut = expectedAmountOut * (10000 - slippageBps) / 10000
-        const minAmountOut = (expectedAmountOut * BigInt(10000 - slippageBps)) / BigInt(10000);
-        logger.info(`[CDP API] Slippage protection: expected=${expectedAmountOut.toString()}, min=${minAmountOut.toString()} (${slippageBps}bps slippage)`);
-        
-        toAmount = expectedAmountOut.toString();
-
-        // Uniswap V3 SwapRouter ABI for exactInputSingle
-        const swapRouterAbi = [
-          {
-            name: 'exactInputSingle',
-            type: 'function',
-            stateMutability: 'payable',
-            inputs: [
-              {
-                name: 'params',
-                type: 'tuple',
-                components: [
-                  { name: 'tokenIn', type: 'address' },
-                  { name: 'tokenOut', type: 'address' },
-                  { name: 'fee', type: 'uint24' },
-                  { name: 'recipient', type: 'address' },
-                  { name: 'deadline', type: 'uint256' },
-                  { name: 'amountIn', type: 'uint256' },
-                  { name: 'amountOutMinimum', type: 'uint256' },
-                  { name: 'sqrtPriceLimitX96', type: 'uint160' }
-                ]
-              }
-            ],
-            outputs: [{ name: 'amountOut', type: 'uint256' }]
-          }
-        ] as const;
-
-        // Prepare swap parameters using the fee tier that worked in the quote
-        const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20); // 20 minutes
-        const swapParams = {
-          tokenIn: uniswapFromToken as `0x${string}`,
-          tokenOut: uniswapToToken as `0x${string}`,
-          fee: quoteParams.fee, // Use the fee tier from successful quote
-          recipient: account.address as `0x${string}`,
-          deadline,
-          amountIn: BigInt(fromAmount),
-          amountOutMinimum: minAmountOut,
-          sqrtPriceLimitX96: 0n, // No price limit
-        };
-
-        // Encode the function call
-        const data = encodeFunctionData({
-          abi: swapRouterAbi,
-          functionName: 'exactInputSingle',
-          args: [swapParams],
-        });
-
-        // No native token value needed since we're using wrapped tokens
-        const value = 0n;
-
-        // Send the transaction
-        const hash = await walletClient.sendTransaction({
-          to: routerAddress as `0x${string}`,
-          data,
-          value,
-          chain,
-        });
-
-        // Wait for confirmation
-        await publicClient.waitForTransactionReceipt({ hash });
-        logger.info(`[CDP API] Uniswap V3 swap successful: ${hash}`);
-
-        // If swapping TO native token, unwrap it
-        if (isToNative) {
-          logger.info(`[CDP API] Unwrapping output to native token`);
-          
-          // Get wrapped token balance to unwrap
-          const balanceAbi = [
-            {
-              name: 'balanceOf',
-              type: 'function',
-              stateMutability: 'view',
-              inputs: [{ name: 'account', type: 'address' }],
-              outputs: [{ name: '', type: 'uint256' }]
-            }
-          ] as const;
-
-          const wrappedBalance = await publicClient.readContract({
-            address: wrappedNativeAddress as `0x${string}`,
-            abi: balanceAbi,
-            functionName: 'balanceOf',
-            args: [account.address as `0x${string}`],
-          });
-
-          if (wrappedBalance > 0n) {
-            // WETH/WMATIC ABI for withdraw
-            const wethWithdrawAbi = [
-              {
-                name: 'withdraw',
-                type: 'function',
-                stateMutability: 'nonpayable',
-                inputs: [{ name: 'amount', type: 'uint256' }],
-                outputs: []
-              }
-            ] as const;
-
-            const unwrapHash = await walletClient.writeContract({
-              address: wrappedNativeAddress as `0x${string}`,
-              abi: wethWithdrawAbi,
-              functionName: 'withdraw',
-              args: [wrappedBalance],
-            });
-
-            await publicClient.waitForTransactionReceipt({ hash: unwrapHash });
-            logger.info(`[CDP API] Unwrapped ${wrappedBalance.toString()} to native token: ${unwrapHash}`);
-            toAmount = wrappedBalance.toString();
-          }
-        }
-
-        transactionHash = hash;
-        method = 'uniswap-v3-viem';
-        logger.info(`[CDP API] Uniswap V3 + viem swap complete: ${transactionHash}`);
       }
 
       if (!transactionHash) {
