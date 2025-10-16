@@ -15,8 +15,8 @@ interface Token {
   name: string;
   balance: string;
   balanceFormatted: string;
-  usdValue: number;
-  usdPrice: number;
+  usdValue: number | null;
+  usdPrice: number | null;
   contractAddress: string | null;
   chain: string;
   decimals: number;
@@ -220,13 +220,30 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
           {/* Header */}
           <div className="sticky top-0 bg-background border-b border-border p-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-3">
-              {token.icon && (token.icon.startsWith('/') || token.icon.startsWith('http')) ? (
-                <img src={token.icon} alt={token.symbol} className="w-10 h-10 rounded-full" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg font-bold">
-                  {token.symbol[0]}
-                </div>
-              )}
+              {(() => {
+                // Check if token has icon from CoinGecko
+                if (token.icon && token.icon.startsWith('http')) {
+                  return <img src={token.icon} alt={token.symbol} className="w-10 h-10 rounded-full" />;
+                }
+                
+                // Native tokens - use local SVGs
+                const nativeTokens: Record<string, string> = {
+                  'ETH': '/assets/eth.svg',
+                  'MATIC': '/assets/polygon.svg',
+                  'POL': '/assets/polygon.svg',
+                };
+                
+                if (nativeTokens[token.symbol]) {
+                  return <img src={nativeTokens[token.symbol]} alt={token.symbol} className="w-10 h-10 rounded-full" />;
+                }
+                
+                // Fallback: gray circle with first letter
+                return (
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg font-bold">
+                    {token.symbol[0]}
+                  </div>
+                );
+              })()}
               <div>
                 <h2 className="text-xl font-semibold">{token.symbol}</h2>
                 <p className="text-sm text-muted-foreground">{token.name}</p>
@@ -262,7 +279,7 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
                 )}
               </div>
               <div className="text-sm text-muted-foreground">
-                Balance: {parseFloat(token.balanceFormatted).toFixed(6)} {token.symbol} (${token.usdValue.toFixed(2)})
+                Balance: {parseFloat(token.balanceFormatted).toFixed(6)} {token.symbol} (${token.usdValue?.toFixed(2) || '0.00'})
               </div>
             </div>
 

@@ -3,6 +3,10 @@ import { logger } from '@elizaos/core';
 import { CdpClient } from '@coinbase/cdp-sdk';
 import type { AgentServer } from '../../index';
 import { sendError, sendSuccess } from '../shared/response-utils';
+import { createWalletClient, http } from 'viem';
+import { toAccount } from 'viem/accounts';
+import { base, mainnet, polygon, baseSepolia, sepolia } from 'viem/chains';
+        
 
 // Singleton CDP client instance
 let cdpClient: CdpClient | null = null;
@@ -46,6 +50,7 @@ async function getTokenInfo(contractAddress: string, platform: string): Promise<
   icon?: string;
   name?: string;
   symbol?: string;
+  decimals?: number;
 } | null> {
   const apiKey = process.env.COINGECKO_API_KEY;
   if (!apiKey) {
@@ -68,8 +73,9 @@ async function getTokenInfo(contractAddress: string, platform: string): Promise<
       return {
         price: data.market_data?.current_price?.usd || 0,
         icon: data.image?.small, // Small icon URL
-        name: data.name,
-        symbol: data.symbol?.toUpperCase(),
+        name: data.name || undefined,
+        symbol: data.symbol?.toUpperCase() || undefined,
+        decimals: data.detail_platforms?.[platform]?.decimal_place || 18,
       };
     }
   } catch (err) {
@@ -87,6 +93,8 @@ async function getTokenInfoFromDexScreener(address: string, chainId: string): Pr
   liquidity?: number;
   volume24h?: number;
   priceChange24h?: number;
+  name?: string;
+  symbol?: string;
 } | null> {
   try {
     const url = `https://api.dexscreener.com/latest/dex/tokens/${address}`;
@@ -111,6 +119,8 @@ async function getTokenInfoFromDexScreener(address: string, chainId: string): Pr
       liquidity: parseFloat(pair.liquidity?.usd) || undefined,
       volume24h: parseFloat(pair.volume?.h24) || undefined,
       priceChange24h: parseFloat(pair.priceChange?.h24) || undefined,
+      name: pair.baseToken?.name || undefined,
+      symbol: pair.baseToken?.symbol || undefined,
     };
   } catch (err) {
     logger.warn(`[CDP API] DexScreener error for ${address}:`, err instanceof Error ? err.message : String(err));
@@ -119,41 +129,35 @@ async function getTokenInfoFromDexScreener(address: string, chainId: string): Pr
 }
 
 /**
- * Check if a contract address is an NFT contract using Alchemy NFT API
+ * Fetch native token price from CoinGecko Pro API
  */
-async function isNftContract(contractAddress: string, network: string): Promise<boolean> {
+async function getNativeTokenPrice(coingeckoId: string): Promise<number> {
+  const apiKey = process.env.COINGECKO_API_KEY;
+  if (!apiKey) {
+    logger.warn('[CDP API] CoinGecko API key not configured');
+    return 0;
+  }
+
   try {
-    const alchemyKey = process.env.ALCHEMY_API_KEY;
-    if (!alchemyKey) {
-      return false;
-    }
-
-    const nftApiMap: Record<string, string> = {
-      base: `https://base-mainnet.g.alchemy.com/nft/v3/${alchemyKey}/getNFTsForContract`,
-      ethereum: `https://eth-mainnet.g.alchemy.com/nft/v3/${alchemyKey}/getNFTsForContract`,
-      polygon: `https://polygon-mainnet.g.alchemy.com/nft/v3/${alchemyKey}/getNFTsForContract`,
-    };
-
-    const baseUrl = nftApiMap[network];
-    if (!baseUrl) {
-      return false;
-    }
-
-    const url = `${baseUrl}?contractAddress=${contractAddress}&withMetadata=false&limit=1`;
-    const response = await fetch(url, { method: 'GET' });
+    const url = `https://pro-api.coingecko.com/api/v3/simple/price?ids=${coingeckoId}&vs_currencies=usd`;
+    const response = await fetch(url, {
+      headers: {
+        'x-cg-pro-api-key': apiKey,
+        'Accept': 'application/json',
+      },
+    });
 
     if (response.ok) {
       const data = await response.json();
-      // If the contract returns NFT data, it's an NFT contract
-      return data.nfts && data.nfts.length > 0;
+      return data[coingeckoId]?.usd || 0;
     }
-
-    return false;
   } catch (err) {
-    logger.debug(`[CDP API] Could not verify contract type for ${contractAddress}:`, err instanceof Error ? err.message : String(err));
-    return false;
+    logger.warn(`[CDP API] Failed to fetch native token price for ${coingeckoId}:`, err instanceof Error ? err.message : String(err));
   }
+
+  return 0;
 }
+
 
 export function cdpRouter(_serverInstance: AgentServer): express.Router {
   const router = express.Router();
@@ -202,6 +206,32 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
   });
 
   /**
+   * Helper function to safely convert BigInt balance to number
+   */
+  const safeBalanceToNumber = (balanceHex: string, decimals: number): number => {
+    try {
+      const balance = BigInt(balanceHex);
+      // Convert to string first, then do division to avoid Number overflow
+      const balanceStr = balance.toString();
+      const decimalPoint = balanceStr.length - decimals;
+      
+      if (decimalPoint <= 0) {
+        // Very small number (0.00xxx)
+        const zeros = '0'.repeat(Math.abs(decimalPoint));
+        return parseFloat(`0.${zeros}${balanceStr}`);
+      } else {
+        // Normal number
+        const intPart = balanceStr.slice(0, decimalPoint);
+        const fracPart = balanceStr.slice(decimalPoint);
+        return parseFloat(`${intPart}.${fracPart}`);
+      }
+    } catch (err) {
+      logger.warn(`[CDP API] Error converting balance ${balanceHex} with ${decimals} decimals:`, err instanceof Error ? err.message : String(err));
+      return 0;
+    }
+  };
+
+  /**
    * GET /api/cdp/wallet/tokens/:name
    * Get token balances across all networks
    */
@@ -221,8 +251,14 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
       logger.info(`[CDP API] Fetching token balances for user: ${name}`);
 
       const account = await client.evm.getOrCreateAccount({ name });
+      const address = account.address;
+      const alchemyKey = process.env.ALCHEMY_API_KEY;
       
-      // Supported networks - CDP SDK supports base, ethereum, and polygon for listTokenBalances
+      if (!alchemyKey) {
+        return sendError(res, 503, 'SERVICE_UNAVAILABLE', 'Alchemy API key not configured');
+      }
+
+      // Supported networks
       const networks = ['base', 'ethereum', 'polygon'] as const;
       const platformMap: Record<string, string> = {
         base: 'base',
@@ -230,78 +266,178 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
         polygon: 'polygon-pos',
       };
 
+      const rpcMap: Record<string, string> = {
+        base: `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+        ethereum: `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+        polygon: `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+      };
+
       const allTokens: any[] = [];
       let totalUsdValue = 0;
 
+      // Native token info mapping
+      const nativeTokenInfo: Record<string, { symbol: string; name: string; coingeckoId: string }> = {
+        base: { symbol: 'ETH', name: 'Ethereum', coingeckoId: 'ethereum' },
+        ethereum: { symbol: 'ETH', name: 'Ethereum', coingeckoId: 'ethereum' },
+        polygon: { symbol: 'MATIC', name: 'Polygon', coingeckoId: 'matic-network' },
+      };
+
       for (const network of networks) {
         try {
-          const balancesResponse = await account.listTokenBalances({ network });
-          const balances = balancesResponse?.balances || [];
+          const rpcUrl = rpcMap[network];
 
-          if (balances.length === 0) continue;
+          // Step 1: Fetch native token balance
+          const nativeResponse = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'eth_getBalance',
+              params: [address, 'latest'],
+            }),
+          });
 
-          // Format tokens
-          for (const balance of balances) {
-            const symbol = balance?.token?.symbol || 'UNKNOWN';
-            const contractAddress = balance?.token?.contractAddress;
-            const amountRaw = balance?.amount?.amount?.toString() || '0';
-            const decimals = balance?.amount?.decimals || 18;
+          const nativeJson = await nativeResponse.json();
+          const nativeBalance = BigInt(nativeJson.result || '0');
+
+          // Add native token if balance > 0
+          if (nativeBalance > 0n) {
+            const amountNum = safeBalanceToNumber('0x' + nativeBalance.toString(16), 18);
+            const nativeInfo = nativeTokenInfo[network];
+            const usdPrice = await getNativeTokenPrice(nativeInfo.coingeckoId);
+            const usdValue = amountNum * usdPrice;
             
-            // Skip if it's an NFT contract
-            if (contractAddress && await isNftContract(contractAddress, network)) {
-              logger.debug(`[CDP API] Skipping NFT contract: ${symbol} at ${contractAddress}`);
-              continue;
+            // Only add to total if it's a valid number
+            if (!isNaN(usdValue)) {
+              totalUsdValue += usdValue;
             }
-            
-            // Convert to human-readable
-            const amountNum = parseFloat(amountRaw) / Math.pow(10, decimals);
-            
-            // Get token info (price and icon) from CoinGecko
-            let usdPrice = 0;
-            let icon: string | undefined = undefined;
-            let tokenName = balance?.token?.name || symbol;
-            
-            if (contractAddress) {
-              const tokenInfo = await getTokenInfo(contractAddress, platformMap[network]);
-              if (tokenInfo) {
-                usdPrice = tokenInfo.price;
-                icon = tokenInfo.icon;
-                if (tokenInfo.name) tokenName = tokenInfo.name;
-              } else {
-                // Fallback to DexScreener if CoinGecko fails
+
+            allTokens.push({
+              symbol: nativeInfo.symbol,
+              name: nativeInfo.name,
+              balance: isNaN(amountNum) ? '0' : amountNum.toString(),
+              balanceFormatted: isNaN(amountNum) ? '0' : amountNum.toFixed(6).replace(/\.?0+$/, ''),
+              usdValue: isNaN(usdValue) ? 0 : usdValue,
+              usdPrice: isNaN(usdPrice) ? 0 : usdPrice,
+              contractAddress: null,
+              chain: network,
+              decimals: 18,
+              icon: undefined,
+            });
+          }
+
+          // Step 2: Fetch ERC20 token balances using Alchemy
+          const tokensResponse = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 2,
+              method: 'alchemy_getTokenBalances',
+              params: [address],
+            }),
+          });
+
+          if (!tokensResponse.ok) {
+            logger.warn(`[CDP API] Failed to fetch tokens for ${network}: ${tokensResponse.status}`);
+            continue;
+          }
+
+          const tokensJson = await tokensResponse.json();
+          if (tokensJson.error) {
+            logger.warn(`[CDP API] RPC error for ${network}:`, tokensJson.error);
+            continue;
+          }
+
+          const tokenBalances = tokensJson?.result?.tokenBalances || [];
+
+          // Step 3: Process ERC20 tokens
+          for (const tokenBalance of tokenBalances) {
+            try {
+              const contractAddress = tokenBalance.contractAddress;
+              const tokenBalanceHex = tokenBalance.tokenBalance;
+              
+              // Skip tokens with 0 balance
+              if (!tokenBalanceHex || BigInt(tokenBalanceHex) === 0n) continue;
+              
+              // Get token info from CoinGecko
+              let tokenInfo = await getTokenInfo(contractAddress, platformMap[network]);
+              let usdPrice = 0;
+              
+              if (!tokenInfo) {
+                // Try DexScreener as fallback
                 const dexInfo = await getTokenInfoFromDexScreener(contractAddress, network);
                 if (dexInfo?.price) {
                   usdPrice = dexInfo.price;
+                  // Use DexScreener data with token metadata
+                  const amountNum = safeBalanceToNumber(tokenBalanceHex, 18); // Assume 18 decimals
+                  const usdValue = amountNum * usdPrice;
+                  
+                  // Only add to total if it's a valid number
+                  if (!isNaN(usdValue)) {
+                    totalUsdValue += usdValue;
+                  }
+                  
+                  allTokens.push({
+                    symbol: dexInfo.symbol?.toUpperCase() || 'UNKNOWN',
+                    name: dexInfo.name || 'Unknown Token',
+                    balance: isNaN(amountNum) ? '0' : amountNum.toString(),
+                    balanceFormatted: isNaN(amountNum) ? '0' : amountNum.toFixed(6).replace(/\.?0+$/, ''),
+                    usdValue: isNaN(usdValue) ? 0 : usdValue,
+                    usdPrice: isNaN(usdPrice) ? 0 : usdPrice,
+                    contractAddress,
+                    chain: network,
+                    decimals: 18,
+                    icon: undefined,
+                  });
+                } else {
+                  logger.debug(`[CDP API] Could not get price for token ${contractAddress} on ${network}`);
                 }
+                continue;
               }
+              
+              // Use token info price, fallback to 0 if null
+              usdPrice = tokenInfo.price || 0;
+              
+              // Convert balance using correct decimals
+              const amountNum = safeBalanceToNumber(tokenBalanceHex, tokenInfo.decimals || 18);
+              const usdValue = amountNum * usdPrice;
+              
+              // Only add to total if it's a valid number
+              if (!isNaN(usdValue)) {
+                totalUsdValue += usdValue;
+              }
+              
+              allTokens.push({
+                symbol: tokenInfo.symbol || 'UNKNOWN',
+                name: tokenInfo.name || 'Unknown Token',
+                balance: isNaN(amountNum) ? '0' : amountNum.toString(),
+                balanceFormatted: isNaN(amountNum) ? '0' : amountNum.toFixed(6).replace(/\.?0+$/, ''),
+                usdValue: isNaN(usdValue) ? 0 : usdValue,
+                usdPrice: isNaN(usdPrice) ? 0 : usdPrice,
+                contractAddress,
+                chain: network,
+                decimals: tokenInfo.decimals || 18,
+                icon: tokenInfo.icon,
+              });
+            } catch (err) {
+              logger.warn(`[CDP API] Error processing token ${tokenBalance.contractAddress} on ${network}:`, err instanceof Error ? err.message : String(err));
             }
-
-            const usdValue = amountNum * usdPrice;
-            totalUsdValue += usdValue;
-
-            allTokens.push({
-              symbol,
-              name: tokenName,
-              balance: amountNum.toString(),
-              balanceFormatted: amountNum.toFixed(6).replace(/\.?0+$/, ''),
-              usdValue,
-              usdPrice,
-              contractAddress: contractAddress || null,
-              chain: network,
-              decimals,
-              icon, // Add icon field
-            });
           }
         } catch (err) {
           logger.warn(`[CDP API] Failed to fetch balances for ${network}:`, err instanceof Error ? err.message : String(err));
         }
       }
 
-      logger.info(`[CDP API] Found ${allTokens.length} tokens for user ${name}, total value: $${totalUsdValue.toFixed(2)}`);
+      // Ensure totalUsdValue is a valid number
+      const finalTotalUsdValue = isNaN(totalUsdValue) ? 0 : totalUsdValue;
+      
+      logger.info(`[CDP API] Found ${allTokens.length} tokens for user ${name}, total value: $${finalTotalUsdValue.toFixed(2)}`);
 
       sendSuccess(res, {
         tokens: allTokens,
-        totalUsdValue,
+        totalUsdValue: finalTotalUsdValue,
         address: account.address,
       });
     } catch (error) {
@@ -529,7 +665,7 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
 
   /**
    * POST /api/cdp/wallet/send
-   * Send tokens from server wallet
+   * Send tokens from server wallet with fallback to viem
    */
   router.post('/wallet/send', async (req, res) => {
     try {
@@ -546,31 +682,133 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
 
       logger.info(`[CDP API] Sending ${amount} ${token} to ${to} on ${network} for user ${name}`);
 
-      const account = await client.evm.getOrCreateAccount({ name });
-      const networkAccount = await account.useNetwork(network);
+      // Try CDP SDK first
+      let cdpSuccess = false;
+      let transactionHash: string | undefined;
+      let fromAddress: string;
 
-      // Convert amount to bigint (assuming it's already in base units with decimals)
-      const amountBigInt = BigInt(amount);
+      try {
+        logger.info(`[CDP API] Attempting transfer with CDP SDK...`);
+        const account = await client.evm.getOrCreateAccount({ name });
+        const networkAccount = await account.useNetwork(network);
+        fromAddress = account.address;
 
-      const result = await networkAccount.transfer({
-        to: to as `0x${string}`,
-        amount: amountBigInt,
-        token: token as any,
-      });
+        // Convert amount to bigint (assuming it's already in base units with decimals)
+        const amountBigInt = BigInt(amount);
 
-      if (!result.transactionHash) {
+        const result = await networkAccount.transfer({
+          to: to as `0x${string}`,
+          amount: amountBigInt,
+          token: token as any,
+        });
+
+        if (result.transactionHash) {
+          transactionHash = result.transactionHash;
+          cdpSuccess = true;
+          logger.info(`[CDP API] CDP SDK transfer successful: ${transactionHash}`);
+        }
+      } catch (cdpError) {
+        logger.warn(
+          `[CDP API] CDP SDK transfer failed, trying viem fallback:`,
+          cdpError instanceof Error ? cdpError.message : String(cdpError)
+        );
+
+        // Fallback to viem
+        logger.info(`[CDP API] Using viem fallback for transfer...`);
+        
+        const chainMap: Record<string, any> = {
+          'base': base,
+          'base-sepolia': baseSepolia,
+          'ethereum': mainnet,
+          'ethereum-sepolia': sepolia,
+          'polygon': polygon,
+        };
+
+        const chain = chainMap[network];
+        if (!chain) {
+          throw new Error(`Unsupported network: ${network}`);
+        }
+
+        // Get wallet from CDP
+        const account = await client.evm.getOrCreateAccount({ name });
+        fromAddress = account.address;
+
+        // Get Alchemy key for RPC
+        const alchemyKey = process.env.ALCHEMY_API_KEY;
+        if (!alchemyKey) {
+          throw new Error('Alchemy API key not configured');
+        }
+
+        const rpcUrls: Record<string, string> = {
+          'base': `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+          'base-sepolia': `https://base-sepolia.g.alchemy.com/v2/${alchemyKey}`,
+          'ethereum': `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+          'ethereum-sepolia': `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`,
+          'polygon': `https://polygon-mainnet.g.alchemy.com/v2/${alchemyKey}`,
+        };
+
+        // Create wallet client
+        const walletClient = createWalletClient({
+          account: toAccount(account),
+          chain,
+          transport: http(rpcUrls[network]),
+        });
+
+        const amountBigInt = BigInt(amount);
+
+        // Check if it's a native token or ERC20
+        const isNativeToken = !token.startsWith('0x');
+        
+        if (isNativeToken) {
+          // Native token transfer (ETH, MATIC, etc.)
+          logger.info(`[CDP API] Sending native token via viem...`);
+          const hash = await walletClient.sendTransaction({
+            chain,
+            to: to as `0x${string}`,
+            value: amountBigInt,
+          });
+          transactionHash = hash;
+        } else {
+          // ERC20 token transfer
+          logger.info(`[CDP API] Sending ERC20 token ${token} via viem...`);
+          
+          // ERC20 transfer function
+          const hash = await walletClient.writeContract({
+            chain,
+            address: token as `0x${string}`,
+            abi: [
+              {
+                name: 'transfer',
+                type: 'function',
+                stateMutability: 'nonpayable',
+                inputs: [
+                  { name: 'to', type: 'address' },
+                  { name: 'amount', type: 'uint256' }
+                ],
+                outputs: [{ name: '', type: 'bool' }]
+              }
+            ] as const,
+            functionName: 'transfer',
+            args: [to as `0x${string}`, amountBigInt],
+          });
+          transactionHash = hash;
+        }
+
+        logger.info(`[CDP API] Viem transfer successful: ${transactionHash}`);
+      }
+
+      if (!transactionHash) {
         throw new Error('Transfer did not return a transaction hash');
       }
 
-      logger.info(`[CDP API] Transfer successful: ${result.transactionHash}`);
-
       sendSuccess(res, {
-        transactionHash: result.transactionHash,
-        from: account.address,
+        transactionHash,
+        from: fromAddress!,
         to,
         amount: amount.toString(),
         token,
         network,
+        method: cdpSuccess ? 'cdp-sdk' : 'viem-fallback',
       });
     } catch (error) {
       logger.error(

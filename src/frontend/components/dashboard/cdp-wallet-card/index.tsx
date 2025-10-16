@@ -14,8 +14,8 @@ interface Token {
   name: string;
   balance: string;
   balanceFormatted: string;
-  usdValue: number;
-  usdPrice: number;
+  usdValue: number | null;
+  usdPrice: number | null;
   contractAddress: string | null;
   chain: string;
   decimals: number;
@@ -54,9 +54,10 @@ interface Transaction {
 interface CDPWalletCardProps {
   userId: string;
   walletAddress?: string;
+  onBalanceChange?: (balance: number) => void;
 }
 
-export function CDPWalletCard({ userId, walletAddress }: CDPWalletCardProps) {
+export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWalletCardProps) {
   // Format address for display (shortened)
   const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
   const [isCopied, setIsCopied] = useState(false);
@@ -143,6 +144,13 @@ export function CDPWalletCard({ userId, walletAddress }: CDPWalletCardProps) {
       setIsLoadingHistory(false);
     }
   };
+
+  // Notify parent of balance changes
+  useEffect(() => {
+    if (onBalanceChange) {
+      onBalanceChange(totalUsdValue);
+    }
+  }, [totalUsdValue, onBalanceChange]);
 
   // Initial load
   useEffect(() => {
@@ -403,7 +411,7 @@ export function CDPWalletCard({ userId, walletAddress }: CDPWalletCardProps) {
                       </div>
                     </div>
                     <span className="text-xs sm:text-sm font-mono flex-shrink-0 ml-2">
-                      ${token.usdValue.toFixed(2)}
+                      ${token.usdValue?.toFixed(2) ?? '0.00'}
                     </span>
                   </button>
                 ))
@@ -526,7 +534,7 @@ export function CDPWalletCard({ userId, walletAddress }: CDPWalletCardProps) {
       <SendModal
         isOpen={isSendModalOpen}
         onClose={() => setIsSendModalOpen(false)}
-        tokens={tokens}
+        tokens={tokens as any}
         userId={userId}
         onSuccess={() => {
           setIsSendModalOpen(false);
@@ -538,7 +546,7 @@ export function CDPWalletCard({ userId, walletAddress }: CDPWalletCardProps) {
         <TokenDetailModal
           isOpen={!!selectedToken}
           onClose={() => setSelectedToken(null)}
-          token={selectedToken}
+          token={selectedToken as any}
         />
       )}
 

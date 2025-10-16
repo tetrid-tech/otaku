@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -9,11 +9,12 @@ interface Token {
   name: string;
   balance: string;
   balanceFormatted: string;
-  usdValue: number;
-  usdPrice: number;
+  usdValue: number | null;
+  usdPrice: number | null;
   contractAddress: string | null;
   chain: string;
   decimals: number;
+  icon?: string;
 }
 
 interface SendModalProps {
@@ -25,12 +26,71 @@ interface SendModalProps {
 }
 
 export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendModalProps) {
-  const [selectedToken, setSelectedToken] = useState<Token | null>(tokens[0] || null);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // Validate recipient address
+  const isValidAddress = useMemo(() => {
+    if (!recipientAddress) return null;
+    return /^0x[a-fA-F0-9]{40}$/.test(recipientAddress);
+  }, [recipientAddress]);
+
+  // Calculate USD value of amount
+  const usdValue = useMemo(() => {
+    if (!amount || !selectedToken || !selectedToken.usdPrice) return 0;
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount)) return 0;
+    return numAmount * selectedToken.usdPrice;
+  }, [amount, selectedToken]);
+
+  // Check if amount is valid
+  const isValidAmount = useMemo(() => {
+    if (!amount || !selectedToken) return null;
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return false;
+    return numAmount <= parseFloat(selectedToken.balance);
+  }, [amount, selectedToken]);
+
+  // Get token icon (with fallback for native tokens)
+  const getTokenIcon = (token: Token) => {
+    if (token.icon) {
+      return token.icon;
+    }
+    
+    // Fallback icons for native tokens
+    if (!token.contractAddress) {
+      if (token.chain === 'polygon') {
+        return '/assets/polygon.svg';
+      }
+      // ETH for base and ethereum
+      return '/assets/eth.svg';
+    }
+    
+    return null;
+  };
 
   // Get explorer URL
   const getExplorerUrl = (chain: string, hash: string) => {
@@ -49,42 +109,53 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
       return;
     }
 
-    // Validate address format
-    if (!recipientAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-      setError('Invalid recipient address');
+    if (!isValidAddress || !isValidAmount) {
+      setError('Invalid address or amount');
       return;
     }
 
-    // Validate amount
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Invalid amount');
-      return;
-    }
-
-    // Check if amount exceeds balance
-    const balanceNum = parseFloat(selectedToken.balance);
-    if (amountNum > balanceNum) {
-      setError(`Insufficient balance. You have ${selectedToken.balanceFormatted} ${selectedToken.symbol}`);
-      return;
-    }
+    // All tokens are now sendable with viem fallback
+    // No need to check network support anymore
 
     setIsSending(true);
     setError(null);
     setTxHash(null);
 
     try {
-      // Convert amount to base units (wei/smallest unit)
-      const amountInBaseUnits = (amountNum * Math.pow(10, selectedToken.decimals)).toString();
+      const amountNum = parseFloat(amount);
+      
+      // Validate amount is a valid number
+      if (isNaN(amountNum) || !isFinite(amountNum)) {
+        throw new Error('Invalid amount');
+      }
+      
+      // Convert amount to base units (wei/smallest unit) - avoid scientific notation
+      const multiplier = Math.pow(10, selectedToken.decimals);
+      const amountInBaseUnits = BigInt(Math.floor(amountNum * multiplier)).toString();
 
       // Determine token parameter
       let tokenParam: string;
       if (!selectedToken.contractAddress) {
-        // Native token (ETH, MATIC, etc)
-        tokenParam = selectedToken.symbol.toLowerCase();
+        // Native token - use specific symbol for each chain
+        const nativeTokenMap: Record<string, string> = {
+          'base': 'eth',
+          'ethereum': 'eth',
+          'polygon': 'matic',
+        };
+        tokenParam = nativeTokenMap[selectedToken.chain.toLowerCase()] || 'eth';
       } else {
+        // ERC20 token - use contract address
         tokenParam = selectedToken.contractAddress;
       }
+
+      console.log('📤 Sending transaction:', {
+        userId,
+        network: selectedToken.chain,
+        to: recipientAddress,
+        token: tokenParam,
+        amount: amountInBaseUnits,
+        decimals: selectedToken.decimals,
+      });
 
       const data = await elizaClient.cdp.sendToken({
         name: userId,
@@ -94,12 +165,14 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
         amount: amountInBaseUnits,
       });
 
+      console.log('✅ Transaction sent:', data);
       setTxHash(data.transactionHash);
       setIsSending(false);
       // Don't auto-close, let user close manually after seeing success
-    } catch (err) {
-      console.error('Error sending transaction:', err);
-      setError(err instanceof Error ? err.message : 'Failed to send transaction');
+    } catch (err: any) {
+      console.error('❌ Send failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send transaction';
+      setError(errorMessage);
       setIsSending(false);
     }
   };
@@ -118,7 +191,7 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
 
   const handleMaxClick = () => {
     if (selectedToken) {
-      setAmount(selectedToken.balance);
+      setAmount(selectedToken.balanceFormatted);
     }
   };
 
@@ -128,7 +201,7 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
   if (txHash && selectedToken) {
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={handleClose}>
-        <div className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-hidden p-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-background rounded-lg max-w-lg w-full max-h-[95vh] overflow-hidden p-1.5" onClick={(e) => e.stopPropagation()}>
           <div className="bg-pop rounded-lg p-4 sm:p-6 space-y-4 max-h-[calc(90vh-0.75rem)] overflow-y-auto">
             <h3 className="text-lg font-semibold">Transaction Sent!</h3>
             
@@ -170,7 +243,7 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
   if (isSending) {
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div className="bg-background rounded-lg max-w-md w-full overflow-hidden p-1.5">
+        <div className="bg-background rounded-lg max-w-lg w-full overflow-hidden p-1.5">
           <div className="bg-pop rounded-lg p-4 sm:p-6 space-y-4">
             <h3 className="text-lg font-semibold">Sending Transaction...</h3>
             
@@ -200,8 +273,8 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={handleClose}>
-      <div className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-hidden p-1.5" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-pop rounded-lg p-4 sm:p-6 space-y-4 max-h-[calc(90vh-0.75rem)] overflow-y-auto">
+      <div className="bg-background rounded-lg max-w-lg w-full max-h-[95vh] p-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-pop rounded-lg p-4 sm:p-6 space-y-4 max-h-[calc(95vh-0.75rem)] overflow-y-auto">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Send Tokens</h3>
             <button onClick={handleClose} className="text-muted-foreground hover:text-foreground">
@@ -210,26 +283,74 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
           </div>
 
           {/* Token Selection */}
-          <div className="space-y-2">
+          <div className="space-y-2" style={{ overflow: 'visible' }}>
             <label className="text-sm font-medium">Select Token</label>
-            <div className="max-h-48 overflow-y-auto border border-border rounded-lg">
-              {tokens.map((token, index) => (
-                <button
-                  key={`${token.chain}-${token.contractAddress || token.symbol}-${index}`}
-                  onClick={() => setSelectedToken(token)}
-                  className={`w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0 ${
-                    selectedToken?.contractAddress === token.contractAddress && selectedToken?.chain === token.chain
-                      ? 'bg-muted/50'
-                      : ''
-                  }`}
-                >
+            <div className="relative" ref={dropdownRef} style={{ zIndex: 60 }}>
+              {/* Dropdown Button */}
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full p-3 border border-border rounded-lg flex items-center justify-between hover:bg-accent/50 transition-colors"
+              >
+                {selectedToken ? (
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{token.symbol}</span>
-                    <span className="text-xs text-muted-foreground capitalize">({token.chain})</span>
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      {getTokenIcon(selectedToken) ? (
+                        <img src={getTokenIcon(selectedToken)!} alt={selectedToken.symbol} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-bold text-muted-foreground uppercase">{selectedToken.symbol.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium">{selectedToken.symbol}</p>
+                      <p className="text-xs text-muted-foreground">{selectedToken.chain.toUpperCase()}</p>
+                    </div>
                   </div>
-                  <span className="text-sm text-muted-foreground">{token.balanceFormatted}</span>
-                </button>
-              ))}
+                ) : (
+                  <span className="text-muted-foreground">Select a token...</span>
+                )}
+                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {tokens.map((token, index) => (
+                    <button
+                      key={`${token.chain}-${token.contractAddress || token.symbol}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedToken(token);
+                        setAmount('');
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full p-3 flex items-center justify-between hover:bg-accent transition-colors ${
+                        selectedToken === token ? 'bg-accent' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                          {getTokenIcon(token) ? (
+                            <img src={getTokenIcon(token)!} alt={token.symbol} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-sm font-bold text-muted-foreground uppercase">{token.symbol.charAt(0)}</span>
+                          )}
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-medium">{token.symbol}</p>
+                          <p className="text-xs text-muted-foreground">{token.chain.toUpperCase()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-mono">{parseFloat(token.balanceFormatted).toFixed(6)}</p>
+                        <p className="text-xs text-muted-foreground">${token.usdValue?.toFixed(2) || '0.00'}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -241,8 +362,13 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
               placeholder="0x..."
               value={recipientAddress}
               onChange={(e) => setRecipientAddress(e.target.value)}
-              disabled={isSending}
+              className={`font-mono text-sm ${
+                recipientAddress && !isValidAddress ? 'border-red-500' : ''
+              }`}
             />
+            {recipientAddress && !isValidAddress && (
+              <p className="text-xs text-red-500">Invalid address</p>
+            )}
           </div>
 
           {/* Amount */}
@@ -250,56 +376,62 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
             <label className="text-sm font-medium">Amount</label>
             <div className="relative">
               <Input
-                type="number"
-                step="any"
+                type="text"
                 placeholder="0.0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                disabled={isSending}
+                className={`font-mono pr-16 ${
+                  amount && !isValidAmount ? 'border-red-500' : ''
+                }`}
               />
-              {selectedToken && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 text-xs"
-                  onClick={handleMaxClick}
-                  disabled={isSending}
-                >
-                  Max
-                </Button>
-              )}
+              <button
+                onClick={handleMaxClick}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+              >
+                MAX
+              </button>
             </div>
-            {selectedToken && amount && (
-              <div className="text-xs text-muted-foreground">
-                ≈ ${(parseFloat(amount) * selectedToken.usdPrice).toFixed(2)}
+            {selectedToken && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Balance: {parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.symbol}</span>
+                {amount && isValidAmount && <span>≈ ${usdValue.toFixed(2)}</span>}
               </div>
+            )}
+            {amount && !isValidAmount && (
+              <p className="text-xs text-red-500">Insufficient balance</p>
             )}
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="text-xs text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
-              {error}
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded">
+              <p className="text-sm text-red-500">{error}</p>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2">
             <Button
-              variant="outline"
               onClick={handleClose}
-              disabled={isSending}
+              variant="outline"
               className="flex-1"
+              disabled={isSending}
             >
               Cancel
             </Button>
             <Button
               onClick={handleSend}
-              disabled={isSending || !selectedToken || !recipientAddress || !amount}
               className="flex-1"
+              disabled={
+                !selectedToken ||
+                !recipientAddress ||
+                !amount ||
+                !isValidAddress ||
+                !isValidAmount ||
+                isSending
+              }
             >
-              Send
+              {isSending ? 'Sending...' : 'Send'}
             </Button>
           </div>
         </div>

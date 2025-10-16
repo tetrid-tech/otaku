@@ -740,7 +740,7 @@ function App() {
         <div className="col-span-3 hidden lg:block">
           <div className="space-y-gap py-sides min-h-screen max-h-screen sticky top-0 overflow-clip">
             <Widget widgetData={mockData.widgetData} />
-            {userId && <CDPWalletCard userId={userId} walletAddress={userProfile?.walletAddress} />}
+            {userId && <CDPWalletCard userId={userId} walletAddress={userProfile?.walletAddress} onBalanceChange={setTotalBalance} />}
           </div>
         </div>
       </div>
