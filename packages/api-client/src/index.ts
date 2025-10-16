@@ -25,6 +25,20 @@ export { ServerService } from './services/server';
 export { SystemService } from './services/system';
 export { SessionsService } from './services/sessions';
 export { RunsService } from './services/runs';
+export { CdpService } from './services/cdp';
+export type {
+  Token,
+  NFT,
+  Transaction,
+  WalletInfo,
+  TokensResponse,
+  NFTsResponse,
+  TransactionHistoryResponse,
+  SendTokenRequest,
+  SendTokenResponse,
+  SendNFTRequest,
+  SendNFTResponse,
+} from './services/cdp';
 
 // Base client and error
 export { BaseApiClient, ApiError } from './lib/base-client';

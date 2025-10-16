@@ -17,6 +17,7 @@ import { runtimeRouter } from './runtime';
 import { teeRouter } from './tee';
 import { systemRouter } from './system';
 import { entitiesRouter } from './entities';
+import { cdpRouter } from './cdp';
 // NOTE: world router has been removed - functionality moved to messaging/spaces
 import { SocketIORouter } from '../socketio';
 import {
@@ -385,6 +386,9 @@ export function createApiRouter(
 
   // Mount entities router at /entities - handles entity CRUD operations
   router.use('/entities', entitiesRouter(serverInstance));
+
+  // Mount CDP router at /cdp - handles CDP wallet operations
+  router.use('/cdp', cdpRouter(serverInstance));
 
   // Mount audio router at /audio - handles audio processing, transcription, and voice operations
   router.use('/audio', audioRouter(elizaOS));

@@ -1,4 +1,4 @@
-import { useIsSignedIn, useEvmAddress, useSolanaAddress, useSignOut, useIsInitialized, useCurrentUser } from "@coinbase/cdp-hooks";
+import { useIsSignedIn, useSignOut, useIsInitialized, useCurrentUser } from "@coinbase/cdp-hooks";
 
 /**
  * Custom hook to access CDP wallet information
@@ -43,8 +43,6 @@ import { useIsSignedIn, useEvmAddress, useSolanaAddress, useSignOut, useIsInitia
 export function useCDPWallet() {
   const { isInitialized } = useIsInitialized();
   const { isSignedIn } = useIsSignedIn();
-  const { evmAddress } = useEvmAddress();
-  const { solanaAddress } = useSolanaAddress();
   const { signOut } = useSignOut();
   const { currentUser } = useCurrentUser();
 
@@ -52,8 +50,6 @@ export function useCDPWallet() {
   const cdpProjectId = import.meta.env.VITE_CDP_PROJECT_ID;
   const isCdpConfigured = Boolean(cdpProjectId);
 
-  // Derive additional useful states
-  const hasWallet = Boolean(evmAddress || solanaAddress);
   
   // Get user email from CDP currentUser
   // Email is nested in authenticationMethods.email.email
@@ -67,22 +63,12 @@ export function useCDPWallet() {
     isSignedIn,
     isCdpConfigured,
     
-    // Wallet addresses
-    evmAddress,
-    solanaAddress,
-    
     // User info
     userEmail,
-    
-    // Derived states
-    hasWallet,
-    
+
     // Actions
     signOut,
     
-    // Utility helpers
-    shortEvmAddress: evmAddress ? `${evmAddress.slice(0, 6)}...${evmAddress.slice(-4)}` : undefined,
-    shortSolanaAddress: solanaAddress ? `${solanaAddress.slice(0, 6)}...${solanaAddress.slice(-4)}` : undefined,
   };
 }
 

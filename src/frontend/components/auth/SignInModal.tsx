@@ -4,6 +4,7 @@ import { useCDPWallet } from '@/hooks/useCDPWallet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Bullet } from '../ui/bullet';
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -43,17 +44,21 @@ export function SignInModal({ isOpen }: SignInModalProps) {
   if (!isInitialized) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <Card className="w-full max-w-md mx-4">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl">
-              Initializing...
+        <Card className="w-full max-w-md mx-4 bg-background">
+          <CardHeader className="flex items-center justify-between pl-3 pr-1">
+            <CardTitle className="flex items-center gap-2.5 text-sm font-medium uppercase">
+                <Bullet />
+                Initializing...
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="bg-pop">
             <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0052FF]"></div>
               <p className="text-sm text-muted-foreground text-center">
-                Setting up secure wallet authentication
+                Connecting to Coinbase...
+              </p>
+              <p className="text-xs text-muted-foreground text-center">
+                Setting up secure authentication
               </p>
             </div>
           </CardContent>
@@ -109,16 +114,14 @@ export function SignInModal({ isOpen }: SignInModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl">
-            Sign In Required
-          </CardTitle>
-          <p className="text-center text-sm text-muted-foreground mt-2">
-            Please sign in with your email to start chatting
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+       <Card className="w-full max-w-md mx-4 bg-background">
+         <CardHeader className="flex items-center justify-between pl-3 pr-1">
+            <CardTitle className="flex items-center gap-2.5 text-sm font-medium uppercase">
+                <Bullet />
+                Sign In
+            </CardTitle>
+         </CardHeader>
+        <CardContent className="bg-pop">
           {/* Error message */}
           {error && (
             <div className="text-xs text-red-500 bg-red-500/10 p-3 rounded border border-red-500/20">
@@ -188,9 +191,6 @@ export function SignInModal({ isOpen }: SignInModalProps) {
                   }}
                   autoFocus
                 />
-                <span className="text-xs text-muted-foreground">
-                  We'll send you a one-time code to verify your identity
-                </span>
               </div>
               <Button 
                 onClick={handleEmailSubmit} 
@@ -204,11 +204,16 @@ export function SignInModal({ isOpen }: SignInModalProps) {
 
           {/* Info section */}
           <div className="pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center">
-              By signing in, you agree to use CDP Wallet for authentication.
-              <br />
-              Your wallet will be created automatically if you don't have one.
-            </p>
+            <div className="flex items-center justify-center gap-2">
+              <div className="text-xs text-muted-foreground">
+                Protected by 
+              </div>
+              <img 
+                src="/assets/Coinbase_Wordmark.svg" 
+                alt="Coinbase" 
+                className="h-3 w-auto"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

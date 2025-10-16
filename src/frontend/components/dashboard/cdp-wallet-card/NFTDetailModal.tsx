@@ -1,20 +1,19 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Copy, Check, Send, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useSendUserOperation, useCurrentUser } from '@coinbase/cdp-hooks';
-import { encodeFunctionData, isAddress } from 'viem';
+import { Button } from '../../ui/button';
+import { elizaClient } from '../../../lib/elizaClient';
 
 // NFT interface
 interface NFT {
   tokenId: string;
   name: string;
-  description?: string;
+  description: string;
   image: string;
   contractAddress: string;
   contractName: string;
   tokenType: string; // ERC721, ERC1155
-  chain: 'base' | 'ethereum' | 'polygon';
+  chain: string;
   balance?: string;
   attributes?: Array<{
     trait_type: string;
@@ -24,50 +23,13 @@ interface NFT {
 
 interface NFTDetailModalProps {
   nft: NFT;
+  isOpen: boolean;
   onClose: () => void;
+  userId: string;
   onSuccess?: () => void;
 }
 
-// ERC721 Transfer ABI
-const ERC721_TRANSFER_ABI = [
-  {
-    name: 'transferFrom',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'from', type: 'address' },
-      { name: 'to', type: 'address' },
-      { name: 'tokenId', type: 'uint256' },
-    ],
-    outputs: [],
-  },
-] as const;
-
-// ERC1155 Transfer ABI
-const ERC1155_TRANSFER_ABI = [
-  {
-    name: 'safeTransferFrom',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'from', type: 'address' },
-      { name: 'to', type: 'address' },
-      { name: 'id', type: 'uint256' },
-      { name: 'amount', type: 'uint256' },
-      { name: 'data', type: 'bytes' },
-    ],
-    outputs: [],
-  },
-] as const;
-
-// Chain ID mapping
-const CHAIN_IDS: Record<string, number> = {
-  base: 8453,
-  ethereum: 1,
-  polygon: 137,
-};
-
-export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps) {
+export function NFTDetailModal({ nft, isOpen, onClose, userId, onSuccess }: NFTDetailModalProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [showSendForm, setShowSendForm] = useState(false);
   const [recipientAddress, setRecipientAddress] = useState('');
@@ -75,9 +37,6 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
   const [isLoading, setIsLoading] = useState(false);
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
-
-  const { sendUserOperation } = useSendUserOperation();
-  const { currentUser } = useCurrentUser();
 
   // Get chain name for display
   const getChainName = (chain: string) => {
@@ -89,7 +48,7 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
     return names[chain] || chain;
   };
 
-  // Get explorer URL
+  // Get explorer URL for NFT
   const getExplorerUrl = (chain: string, address: string, tokenId: string) => {
     const explorers: Record<string, string> = {
       base: 'https://basescan.org',
@@ -99,14 +58,14 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
     return `${explorers[chain] || explorers.base}/nft/${address}/${tokenId}`;
   };
 
-  // Get User Operation explorer URL
-  const getUserOpExplorerUrl = (hash: string, chain: string) => {
-    const chainNames: Record<string, string> = {
-      base: 'base',
-      ethereum: 'mainnet',
-      polygon: 'polygon',
+  // Get transaction explorer URL
+  const getTxExplorerUrl = (hash: string, chain: string) => {
+    const explorers: Record<string, string> = {
+      base: 'https://basescan.org',
+      ethereum: 'https://etherscan.io',
+      polygon: 'https://polygonscan.com',
     };
-    return `https://jiffyscan.xyz/userOpHash/${hash}?network=${chainNames[chain] || 'base'}`;
+    return `${explorers[chain] || explorers.base}/tx/${hash}`;
   };
 
   // Handle copy contract address
@@ -122,70 +81,38 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
 
   // Handle send NFT
   const handleSend = async () => {
-    if (!recipientAddress || !isAddress(recipientAddress)) {
+    if (!recipientAddress) {
       setError('Please enter a valid recipient address');
       return;
     }
 
-    if (!currentUser?.evmSmartAccounts?.[0]) {
-      setError('Smart Account not found');
+    // Validate address format
+    if (!recipientAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+      setError('Invalid recipient address');
       return;
     }
-
-    const fromAddress = currentUser.evmSmartAccounts[0];
 
     try {
       setIsLoading(true);
       setError('');
 
-      let data: `0x${string}`;
-
-      if (nft.tokenType === 'ERC1155') {
-        // ERC1155 transfer
-        const transferAmount = BigInt(amount);
-        data = encodeFunctionData({
-          abi: ERC1155_TRANSFER_ABI,
-          functionName: 'safeTransferFrom',
-          args: [fromAddress, recipientAddress as `0x${string}`, BigInt(nft.tokenId), transferAmount, '0x'],
-        });
-      } else {
-        // ERC721 transfer
-        data = encodeFunctionData({
-          abi: ERC721_TRANSFER_ABI,
-          functionName: 'transferFrom',
-          args: [fromAddress, recipientAddress as `0x${string}`, BigInt(nft.tokenId)],
-        });
-      }
-
       console.log('🎨 Sending NFT:', {
         contract: nft.contractAddress,
         tokenId: nft.tokenId,
-        from: fromAddress,
         to: recipientAddress,
         type: nft.tokenType,
       });
 
-      const result = await sendUserOperation({
-        evmSmartAccount: fromAddress,
+      const result = await elizaClient.cdp.sendNFT({
+        name: userId,
         network: nft.chain,
-        calls: [
-          {
-            to: nft.contractAddress as `0x${string}`,
-            data,
-            value: 0n,
-          },
-        ],
+        to: recipientAddress,
+        contractAddress: nft.contractAddress,
+        tokenId: nft.tokenId,
       });
 
       console.log('✅ NFT sent successfully:', result);
-      
-      // User Operations return userOperationHash first
-      if (result?.userOperationHash) {
-        setTxHash(result.userOperationHash);
-        console.log('📝 User Operation Hash:', result.userOperationHash);
-      } else {
-        throw new Error('No user operation hash returned');
-      }
+      setTxHash(result.transactionHash);
       
       // Call success callback after a short delay
       if (onSuccess) {
@@ -199,6 +126,8 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
       setIsLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   // Success screen
   if (txHash) {
@@ -223,12 +152,12 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
               </div>
 
               <Button
-                onClick={() => window.open(getUserOpExplorerUrl(txHash, nft.chain), '_blank')}
+                onClick={() => window.open(getTxExplorerUrl(txHash, nft.chain), '_blank')}
                 variant="outline"
                 className="w-full"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
-                View on JiffyScan
+                View on Explorer
               </Button>
 
               <Button onClick={onClose} className="w-full">
@@ -453,4 +382,3 @@ export function NFTDetailModal({ nft, onClose, onSuccess }: NFTDetailModalProps)
     document.body
   );
 }
-

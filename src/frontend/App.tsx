@@ -90,7 +90,7 @@ interface Channel {
 
 function App() {
   // Get CDP wallet info (will be undefined if not configured or not signed in)
-  const { isInitialized, isSignedIn, evmAddress, userEmail, signOut } = useCDPWallet();
+  const { isInitialized, isSignedIn, userEmail, signOut } = useCDPWallet();
   
   const [userId, setUserId] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -137,13 +137,13 @@ function App() {
       return;
     }
 
-    // User is signed in, generate userId from wallet address
+    // User is signed in, generate userId from email address
     async function initUserId() {
-      const id = await getUserId(evmAddress || undefined);
+      const id = await getUserId(userEmail || undefined);
       setUserId(id);
     }
     initUserId();
-  }, [isInitialized, isSignedIn, evmAddress]); // Re-run when CDP state changes
+  }, [isInitialized, isSignedIn, userEmail]); // Re-run when CDP state changes
 
   // Fetch the agent list first to get the ID
   const { data: agentsData } = useQuery({
@@ -159,7 +159,7 @@ function App() {
 
   // Sync user entity whenever userId, wallet address, or email changes
   useEffect(() => {
-    if (!userId || !agentId || !userEmail || !evmAddress) {
+    if (!userId || !agentId || !userEmail) {
       // If any required data is missing, keep loading
       setIsLoadingUserProfile(true);
       return;
@@ -169,6 +169,9 @@ function App() {
       try {
         setIsLoadingUserProfile(true);
         console.log('🔄 Syncing user entity for userId:', userId);
+
+        const wallet = await elizaClient.cdp.getOrCreateWallet(userId);
+        const walletAddress = wallet.address;
         
         // Try to get existing entity
         let entity;
@@ -186,7 +189,7 @@ function App() {
               metadata: {
                 avatarUrl: '/avatars/user_krimson.png',
                 email: userEmail || '',
-                walletAddress: evmAddress || '',
+                walletAddress,
                 displayName: 'KRIMSON',
                 bio: 'DeFi Enthusiast • Blockchain Explorer',
                 createdAt: new Date().toISOString(),
@@ -200,7 +203,7 @@ function App() {
               displayName: entity.metadata?.displayName || 'KRIMSON',
               bio: entity.metadata?.bio || 'DeFi Enthusiast • Blockchain Explorer',
               email: userEmail || '',
-              walletAddress: evmAddress || '',
+              walletAddress,
               memberSince: entity.metadata?.createdAt || new Date().toISOString(),
             });
             setIsLoadingUserProfile(false);
@@ -215,7 +218,7 @@ function App() {
           !entity.metadata?.email ||
           !entity.metadata?.walletAddress ||
           !entity.metadata?.bio ||
-          (evmAddress && entity.metadata?.walletAddress !== evmAddress) ||
+          (walletAddress && entity.metadata?.walletAddress !== walletAddress) ||
           (userEmail && entity.metadata?.email !== userEmail);
 
         if (needsUpdate) {
@@ -225,7 +228,7 @@ function App() {
               ...entity.metadata,
               avatarUrl: entity.metadata?.avatarUrl || '/avatars/user_krimson.png',
               email: userEmail || entity.metadata?.email || '',
-              walletAddress: evmAddress || entity.metadata?.walletAddress || '',
+              walletAddress: walletAddress || entity.metadata?.walletAddress || '',
               displayName: entity.metadata?.displayName || 'KRIMSON',
               bio: entity.metadata?.bio || 'DeFi Enthusiast • Blockchain Explorer',
               updatedAt: new Date().toISOString(),
@@ -243,7 +246,7 @@ function App() {
           displayName: entity.metadata?.displayName || 'KRIMSON',
           bio: entity.metadata?.bio || 'DeFi Enthusiast • Blockchain Explorer',
           email: userEmail || '',
-          walletAddress: evmAddress || '',
+          walletAddress: walletAddress || '',
           memberSince: entity.metadata?.createdAt || new Date().toISOString(),
         });
         setIsLoadingUserProfile(false);
@@ -253,7 +256,7 @@ function App() {
     };
 
     syncUserEntity();
-  }, [userId, evmAddress, userEmail, agentId]); // Re-sync when any of these change
+  }, [userId, userEmail, agentId]); // Re-sync when any of these change
 
 
   // Fetch full agent details (including settings with avatar)
@@ -619,7 +622,7 @@ function App() {
       )}
       
       {/* Loading User Profile Modal - Shows while user profile is being synced */}
-      {!isSignedIn &&isLoadingUserProfile && (
+      {isSignedIn &&isLoadingUserProfile && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-card border-2 border-border rounded-lg p-8 flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -737,7 +740,7 @@ function App() {
         <div className="col-span-3 hidden lg:block">
           <div className="space-y-gap py-sides min-h-screen max-h-screen sticky top-0 overflow-clip">
             <Widget widgetData={mockData.widgetData} />
-            <CDPWalletCard onBalanceChange={setTotalBalance} />
+            {userId && <CDPWalletCard userId={userId} walletAddress={userProfile?.walletAddress} />}
           </div>
         </div>
       </div>

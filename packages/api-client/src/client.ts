@@ -9,6 +9,7 @@ import { SystemService } from './services/system';
 import { SessionsService } from './services/sessions';
 import { RunsService } from './services/runs';
 import { EntitiesService } from './services/entities';
+import { CdpService } from './services/cdp';
 
 export class ElizaClient {
   public readonly agents: AgentsService;
@@ -21,6 +22,7 @@ export class ElizaClient {
   public readonly sessions: SessionsService;
   public readonly runs: RunsService;
   public readonly entities: EntitiesService;
+  public readonly cdp: CdpService;
 
   constructor(config: ApiClientConfig) {
     // Initialize all services with the same config
@@ -34,6 +36,7 @@ export class ElizaClient {
     this.sessions = new SessionsService(config);
     this.runs = new RunsService(config);
     this.entities = new EntitiesService(config);
+    this.cdp = new CdpService(config);
   }
 
   /**
