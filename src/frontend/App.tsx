@@ -110,7 +110,8 @@ function App() {
     
     if (loadingMessage && loadingMessage.length > 0) {
       showLoading('Initializing...', loadingMessage, loadingPanelId);
-    } else if (currentView === 'chat' && (!userId || !connected || isLoadingChannels || (!activeChannelId && !isNewChatMode))) {
+    } else if (currentView === 'chat' && isSignedIn && (!userId || !connected || isLoadingChannels || (!activeChannelId && !isNewChatMode))) {
+      // Only show loading panel if user is signed in - otherwise let the sign-in modal display
       const message = !userId ? 'Initializing user...' : 
                      !connected ? 'Connecting to server...' :
                      isLoadingChannels ? 'Loading channels...' : 
@@ -119,7 +120,7 @@ function App() {
     } else {
       hide(loadingPanelId);
     }
-  }, [loadingMessage, currentView, userId, connected, isLoadingChannels, activeChannelId, isNewChatMode, showLoading, hide]);
+  }, [loadingMessage, currentView, userId, connected, isLoadingChannels, activeChannelId, isNewChatMode, isSignedIn, showLoading, hide]);
 
   // Initialize authentication when CDP sign-in completes
   useEffect(() => {
