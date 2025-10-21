@@ -116,6 +116,11 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
           url = `${baseUrl}/coins/${platform}/contract/${token.contractAddress}/market_chart?vs_currency=usd&days=${days}`;
         }
 
+        // Ensure daily granularity for long ranges like 1y
+        if (activeTimeFrame === '1y') {
+          url += `&interval=daily`;
+        }
+
         const response = await fetch(url, {
           headers: {
             'Accept': 'application/json',
@@ -185,10 +190,10 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
         return `${hours}:${minutes}`;
       case '7d':
         // Format: DD/MM (like monky: 06/07, 07/07)
-        return `${day}/${month}`;
+        return `${month}/${day}`;
       case '30d':
         // Format: DD/MM
-        return `${day}/${month}`;
+        return `${month}/${day}`;
       case '1y':
         // Format: MM/YY
         const year = String(date.getFullYear()).slice(-2);
@@ -368,11 +373,11 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
 
               <div className="bg-accent rounded-lg p-3">
                 {isLoadingChart ? (
-                  <div className="flex items-center justify-center h-[300px]">
+                  <div className="flex items-center justify-center h-[20vh] min-h-[200px]">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : priceData.length > 0 ? (
-                  <ChartContainer config={chartConfig} className="md:aspect-[3/1] w-full">
+                  <ChartContainer config={chartConfig} className="aspect-auto h-[20vh] min-h-[200px] w-full">
                     <AreaChart
                       accessibilityLayer
                       data={priceData}
@@ -432,6 +437,11 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
                           <ChartTooltipContent
                             indicator="dot"
                             className="min-w-[200px] px-4 py-3"
+                            labelFormatter={(_, items) => {
+                              const first = Array.isArray(items) && items.length > 0 ? (items[0] as any) : undefined;
+                              const p = first && typeof first === 'object' ? (first.payload as PriceDataPoint | undefined) : undefined;
+                              return p ? formatDateForTimeframe(p.timestamp, activeTimeFrame) : '';
+                            }}
                             formatter={(value) => `$${typeof value === 'number' ? formatPrice(value) : value}`}
                           />
                         }
@@ -449,7 +459,7 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
                     </AreaChart>
                   </ChartContainer>
                 ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  <div className="flex items-center justify-center h-[40vh] min-h-[240px] text-muted-foreground">
                     No price data available
                   </div>
                 )}
