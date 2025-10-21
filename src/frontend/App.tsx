@@ -69,14 +69,7 @@ interface Channel {
 }
 
 function App() {
-  // Get CDP wallet info (will be undefined if not configured or not signed in)
   const { isInitialized, isSignedIn, userEmail, signOut, currentUser } = useCDPWallet();
-  // TEMPORARY FOR TESTING - Comment out when CDP is configured
-  // const isInitialized = true;
-  // const isSignedIn = true;
-  // const userEmail = "tcm390@nyu.edu"
-  // const signOut = () => {}
-  
   const { showLoading, hide } = useLoadingPanel();
   const [userId, setUserId] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
