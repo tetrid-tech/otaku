@@ -18,7 +18,7 @@ import { ModalProvider } from './contexts/ModalContext';
 import { MessageSquare } from 'lucide-react';
 import mockDataJson from './mock.json';
 import type { MockData } from './types/dashboard';
-import { extractEmailFromCdpUser, extractUsernameFromCdpUser } from '@/lib/cdpUser';
+import { resolveCdpUserInfo } from '@/lib/cdpUser';
 import { UUID } from '@elizaos/core';
 
 const mockData = mockDataJson as MockData;
@@ -200,8 +200,7 @@ function App() {
             console.log('📝 Creating new user entity in database...');
             
             // Extract email and username using shared helper (DRY)
-            const cdpEmail = extractEmailFromCdpUser(currentUser as any, true);
-            const cdpUsername = extractUsernameFromCdpUser(currentUser as any, cdpEmail || undefined);
+            const { email: cdpEmail, username: cdpUsername } = resolveCdpUserInfo(currentUser as any, { isSignedIn: true });
             
             // Use extracted values with fallbacks
             const finalEmail = cdpEmail || userEmail || `${currentUser?.userId}@cdp.local`;
