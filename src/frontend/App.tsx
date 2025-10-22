@@ -151,7 +151,7 @@ function App() {
     // User is signed in with CDP, authenticate with backend
     async function initAuth() {
       try {
-        const { userId, token } = await authenticateUser(userEmail, userName || 'User', currentUser);
+        const { userId, token } = await authenticateUser(userEmail as string, userName || 'User', currentUser);
         setUserId(userId);
       } catch (error) {
         console.error('❌ Failed to authenticate:', error);
