@@ -523,7 +523,6 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                           <div className="flex items-center gap-1">
                             executing {latestActionName} action<AnimatedDots />
                           </div>
-                         
                         </div>
                       )
                     } else if (isTyping) {
@@ -533,7 +532,6 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                           <div className="flex items-center gap-1">
                             OTAKU is thinking<AnimatedDots />
                           </div>
-                          
                         </div>
                       )
                     }
@@ -629,7 +627,6 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                           <div className="flex items-center gap-1">
                             Analyzing your request<AnimatedDots />
                           </div>
-                          
                         </div>
                       }
                     >
