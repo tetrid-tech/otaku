@@ -4,11 +4,15 @@ import { PaginationParams } from './base';
 export interface Agent {
   id: UUID;
   name: string;
-  description?: string;
+  // Server may return bio as a string (summarized) or an array (full character bio)
+  bio?: string | string[];
+  // Present on list response for clarity; equals the character name
+  characterName?: string;
   status: 'active' | 'inactive' | 'stopped';
   enabled?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  // Not always present on all endpoints
+  createdAt?: Date;
+  updatedAt?: Date;
   metadata?: Record<string, any>;
 }
 
@@ -20,7 +24,7 @@ export interface AgentCreateParams {
 
 export interface AgentUpdateParams {
   name?: string;
-  description?: string;
+  bio?: string | string[];
   metadata?: Record<string, any>;
 }
 

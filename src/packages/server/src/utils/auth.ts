@@ -106,7 +106,7 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
  * If token is provided and valid, sets userId and userEmail
  * If token is invalid or missing, continues without setting them
  */
-export function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export function optionalAuth(req: AuthenticatedRequest, next: NextFunction) {
   if (!JWT_SECRET) {
     return next();
   }
