@@ -6,6 +6,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { MobileChatContent } from "./mobile-chat-content";
@@ -69,6 +70,7 @@ export function MobileChat() {
       >
         <SheetHeader className="sr-only">
           <SheetTitle>Chat</SheetTitle>
+          <SheetDescription>Chat with agents</SheetDescription>
         </SheetHeader>
 
         <MobileChatContent />

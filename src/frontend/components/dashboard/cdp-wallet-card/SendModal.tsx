@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { useLoadingPanel } from '../../../contexts/LoadingPanelContext';
+import { useModal } from '../../../contexts/ModalContext';
 import { elizaClient } from '../../../lib/elizaClient';
 import { getTokenIconBySymbol } from '../../../constants/chains';
 
@@ -19,16 +19,15 @@ interface Token {
   icon?: string;
 }
 
-interface SendModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface SendModalContentProps {
   tokens: Token[];
   userId: string;
   onSuccess: () => void;
 }
 
-export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendModalProps) {
+export function SendModalContent({ tokens, userId, onSuccess }: SendModalContentProps) {
   const { showLoading, showSuccess, showError } = useLoadingPanel();
+  const { hideModal } = useModal();
   const modalId = 'send-modal';
   
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
@@ -89,16 +88,6 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
     }
     
     return null;
-  };
-
-  // Get explorer URL
-  const getExplorerUrl = (chain: string, hash: string) => {
-    const explorers: Record<string, string> = {
-      base: 'https://basescan.org',
-      ethereum: 'https://etherscan.io',
-      polygon: 'https://polygonscan.com',
-    };
-    return `${explorers[chain] || explorers.base}/tx/${hash}`;
   };
 
   // Handle send
@@ -187,7 +176,7 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
     setSelectedToken(tokens[0] || null);
     setRecipientAddress('');
     setAmount('');
-    onClose();
+    hideModal(modalId);
   };
 
   const handleMaxClick = () => {
@@ -196,165 +185,155 @@ export function SendModal({ isOpen, onClose, tokens, userId, onSuccess }: SendMo
     }
   };
 
-  if (!isOpen) return null;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Send Tokens</h3>
+      </div>
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={handleClose}>
-      <div className="bg-background rounded-lg max-w-lg w-full max-h-[95vh] p-1.5" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-pop rounded-lg p-4 sm:p-6 space-y-4 max-h-[calc(95vh-0.75rem)] overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Send Tokens</h3>
-            <button onClick={handleClose} className="text-muted-foreground hover:text-foreground">
-              ✕
-            </button>
-          </div>
+      {/* Token Selection */}
+      <div className="space-y-2" style={{ overflow: 'visible' }}>
+        <label className="text-sm font-medium">Select Token</label>
+        <div className="relative" ref={dropdownRef} style={{ zIndex: 60 }}>
+          {/* Dropdown Button */}
+          <button
+            type="button"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="w-full p-3 border border-border rounded-lg flex items-center justify-between hover:bg-accent/50 transition-colors"
+          >
+            {selectedToken ? (
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                  {getTokenIcon(selectedToken) ? (
+                    <img src={getTokenIcon(selectedToken)!} alt={selectedToken.symbol} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-bold text-muted-foreground uppercase">{selectedToken.symbol.charAt(0)}</span>
+                  )}
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium">{selectedToken.symbol}</p>
+                  <p className="text-xs text-muted-foreground">{selectedToken.chain.toUpperCase()}</p>
+                </div>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">Select a token...</span>
+            )}
+            <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-          {/* Token Selection */}
-          <div className="space-y-2" style={{ overflow: 'visible' }}>
-            <label className="text-sm font-medium">Select Token</label>
-            <div className="relative" ref={dropdownRef} style={{ zIndex: 60 }}>
-              {/* Dropdown Button */}
-              <button
-                type="button"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="w-full p-3 border border-border rounded-lg flex items-center justify-between hover:bg-accent/50 transition-colors"
-              >
-                {selectedToken ? (
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {tokens.map((token, index) => (
+                <button
+                  key={`${token.chain}-${token.contractAddress || token.symbol}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setSelectedToken(token);
+                    setAmount('');
+                    setIsDropdownOpen(false);
+                  }}
+                  className={`w-full p-3 flex items-center justify-between hover:bg-accent transition-colors ${
+                    selectedToken === token ? 'bg-accent' : ''
+                  }`}
+                >
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                      {getTokenIcon(selectedToken) ? (
-                        <img src={getTokenIcon(selectedToken)!} alt={selectedToken.symbol} className="w-full h-full object-cover" />
+                      {getTokenIcon(token) ? (
+                        <img src={getTokenIcon(token)!} alt={token.symbol} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-sm font-bold text-muted-foreground uppercase">{selectedToken.symbol.charAt(0)}</span>
+                        <span className="text-sm font-bold text-muted-foreground uppercase">{token.symbol.charAt(0)}</span>
                       )}
                     </div>
                     <div className="text-left">
-                      <p className="text-sm font-medium">{selectedToken.symbol}</p>
-                      <p className="text-xs text-muted-foreground">{selectedToken.chain.toUpperCase()}</p>
+                      <p className="text-sm font-medium">{token.symbol}</p>
+                      <p className="text-xs text-muted-foreground">{token.chain.toUpperCase()}</p>
                     </div>
                   </div>
-                ) : (
-                  <span className="text-muted-foreground">Select a token...</span>
-                )}
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {/* Dropdown Menu */}
-              {isDropdownOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {tokens.map((token, index) => (
-                    <button
-                      key={`${token.chain}-${token.contractAddress || token.symbol}-${index}`}
-                      type="button"
-                      onClick={() => {
-                        setSelectedToken(token);
-                        setAmount('');
-                        setIsDropdownOpen(false);
-                      }}
-                      className={`w-full p-3 flex items-center justify-between hover:bg-accent transition-colors ${
-                        selectedToken === token ? 'bg-accent' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                          {getTokenIcon(token) ? (
-                            <img src={getTokenIcon(token)!} alt={token.symbol} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-sm font-bold text-muted-foreground uppercase">{token.symbol.charAt(0)}</span>
-                          )}
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-medium">{token.symbol}</p>
-                          <p className="text-xs text-muted-foreground">{token.chain.toUpperCase()}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-mono">{parseFloat(token.balanceFormatted).toFixed(6)}</p>
-                        <p className="text-xs text-muted-foreground">${token.usdValue?.toFixed(2) || '0.00'}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+                  <div className="text-right">
+                    <p className="text-sm font-mono">{parseFloat(token.balanceFormatted).toFixed(6)}</p>
+                    <p className="text-xs text-muted-foreground">${token.usdValue?.toFixed(2) || '0.00'}</p>
+                  </div>
+                </button>
+              ))}
             </div>
-          </div>
-
-          {/* Recipient Address */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Recipient Address</label>
-            <Input
-              type="text"
-              placeholder="0x..."
-              value={recipientAddress}
-              onChange={(e) => setRecipientAddress(e.target.value)}
-              className={`font-mono text-sm ${
-                recipientAddress && !isValidAddress ? 'border-red-500' : ''
-              }`}
-            />
-            {recipientAddress && !isValidAddress && (
-              <p className="text-xs text-red-500">Invalid address</p>
-            )}
-          </div>
-
-          {/* Amount */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Amount</label>
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="0.0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className={`font-mono pr-16 ${
-                  amount && !isValidAmount ? 'border-red-500' : ''
-                }`}
-              />
-              <button
-                onClick={handleMaxClick}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-              >
-                MAX
-              </button>
-            </div>
-            {selectedToken && (
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Balance: {parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.symbol}</span>
-                {amount && isValidAmount && <span>≈ ${usdValue.toFixed(2)}</span>}
-              </div>
-            )}
-            {amount && !isValidAmount && (
-              <p className="text-xs text-red-500">Insufficient balance</p>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={handleClose}
-              variant="outline"
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSend}
-              className="flex-1"
-              disabled={
-                !selectedToken ||
-                !recipientAddress ||
-                !amount ||
-                !isValidAddress ||
-                !isValidAmount
-              }
-            >
-              Send
-            </Button>
-          </div>
+          )}
         </div>
       </div>
-    </div>,
-    document.body
+
+      {/* Recipient Address */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Recipient Address</label>
+        <Input
+          type="text"
+          placeholder="0x..."
+          value={recipientAddress}
+          onChange={(e) => setRecipientAddress(e.target.value)}
+          className={`font-mono text-sm ${
+            recipientAddress && !isValidAddress ? 'border-red-500' : ''
+          }`}
+        />
+        {recipientAddress && !isValidAddress && (
+          <p className="text-xs text-red-500">Invalid address</p>
+        )}
+      </div>
+
+      {/* Amount */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Amount</label>
+        <div className="relative">
+          <Input
+            type="text"
+            placeholder="0.0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className={`font-mono pr-16 ${
+              amount && !isValidAmount ? 'border-red-500' : ''
+            }`}
+          />
+          <button
+            onClick={handleMaxClick}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            MAX
+          </button>
+        </div>
+        {selectedToken && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Balance: {parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.symbol}</span>
+            {amount && isValidAmount && <span>≈ ${usdValue.toFixed(2)}</span>}
+          </div>
+        )}
+        {amount && !isValidAmount && (
+          <p className="text-xs text-red-500">Insufficient balance</p>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <Button
+          onClick={handleClose}
+          variant="outline"
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSend}
+          className="flex-1"
+          disabled={
+            !selectedToken ||
+            !recipientAddress ||
+            !amount ||
+            !isValidAddress ||
+            !isValidAmount
+          }
+        >
+          Send
+        </Button>
+      </div>
+    </div>
   );
 }

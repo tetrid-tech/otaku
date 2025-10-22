@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { X, Copy, Check, TrendingUp, TrendingDown } from 'lucide-react';
 import { Button } from '../../ui/button';
+import { useModal } from '../../../contexts/ModalContext';
 import { getTokenIconBySymbol } from '../../../constants/chains';
 import { XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import {
@@ -26,9 +26,7 @@ interface Token {
 
 type ChainNetwork = 'base' | 'ethereum' | 'polygon';
 
-interface TokenDetailModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface TokenDetailModalContentProps {
   token: Token;
 }
 
@@ -47,7 +45,9 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalProps) {
+export function TokenDetailModalContent({ token }: TokenDetailModalContentProps) {
+  const { hideModal } = useModal();
+  const modalId = 'token-detail-modal';
   const [isCopied, setIsCopied] = useState(false);
   const [activeTimeFrame, setActiveTimeFrame] = useState<TimeFrame>('24h');
   const [priceData, setPriceData] = useState<PriceDataPoint[]>([]);
@@ -169,10 +169,8 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
       }
     };
 
-    if (isOpen) {
-      fetchPriceHistory();
-    }
-  }, [token, activeTimeFrame, isOpen]);
+    fetchPriceHistory();
+  }, [token, activeTimeFrame]);
 
   const formatDateForTimeframe = (timestamp: number, timeframe: TimeFrame): string => {
     const date = new Date(timestamp);
@@ -226,263 +224,247 @@ export function TokenDetailModal({ isOpen, onClose, token }: TokenDetailModalPro
     return Array.from({ length: count }, (_, i) => Math.round(min + i * step));
   };
 
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-background rounded-lg max-w-2xl w-full mx-4 shadow-xl max-h-[90vh] overflow-hidden p-1.5" onClick={(e) => e.stopPropagation()}>
-        <div className="bg-pop rounded-lg h-full overflow-y-auto">
-          {/* Header */}
-          <div className="sticky top-0 bg-background border-b border-border p-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-3">
-              {(() => {
-                // Check if token has icon from CoinGecko
-                if (token.icon && token.icon.startsWith('http')) {
-                  return <img src={token.icon} alt={token.symbol} className="w-10 h-10 rounded-full" />;
-                }
-                
-                // Try to get icon from constants
-                const iconPath = getTokenIconBySymbol(token.symbol);
-                if (iconPath) {
-                  return <img src={iconPath} alt={token.symbol} className="w-10 h-10 rounded-full" />;
-                }
-                
-                // Fallback: gray circle with first letter
-                return (
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg font-bold">
-                    {token.symbol[0]}
-                  </div>
-                );
-              })()}
-              <div>
-                <h2 className="text-xl font-semibold">{token.symbol}</h2>
-                <p className="text-sm text-muted-foreground">{token.name}</p>
+  return (
+    <div className="space-y-4 w-full max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-4 border-b border-border">
+        <div className="flex items-center gap-3">
+          {(() => {
+            // Check if token has icon from CoinGecko
+            if (token.icon && token.icon.startsWith('http')) {
+              return <img src={token.icon} alt={token.symbol} className="w-10 h-10 rounded-full" />;
+            }
+            
+            // Try to get icon from constants
+            const iconPath = getTokenIconBySymbol(token.symbol);
+            if (iconPath) {
+              return <img src={iconPath} alt={token.symbol} className="w-10 h-10 rounded-full" />;
+            }
+            
+            // Fallback: gray circle with first letter
+            return (
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg font-bold">
+                {token.symbol[0]}
               </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="p-4 space-y-6">
-            {/* Price Info */}
-            <div className="space-y-2">
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold">${formatPrice(currentPrice)}</span>
-                {priceChange && (
-                  <div className={`flex items-center gap-1 text-sm font-medium ${
-                    priceChange.value >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {priceChange.value >= 0 ? (
-                      <TrendingUp className="w-4 h-4" />
-                    ) : (
-                      <TrendingDown className="w-4 h-4" />
-                    )}
-                    <span>
-                      {priceChange.value >= 0 ? '+' : ''}{priceChange.percentage.toFixed(2)}%
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Balance: {parseFloat(token.balanceFormatted).toFixed(6)} {token.symbol} (${token.usdValue?.toFixed(2) || '0.00'})
-              </div>
-            </div>
-
-            {/* Contract Address */}
-            {token.contractAddress && (
-              <div className="bg-muted rounded-lg p-3 space-y-2">
-                <div className="text-xs text-muted-foreground uppercase font-medium">Contract Address</div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 text-sm bg-background p-2 rounded border border-border overflow-x-auto scrollbar-thin">
-                    {token.contractAddress}
-                  </code>
-                  <Button
-                    onClick={handleCopyAddress}
-                    variant="ghost"
-                    size="sm"
-                    className="flex-shrink-0"
-                  >
-                    {isCopied ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">Chain:</span>
-                  <span className="px-2 py-0.5 rounded bg-background text-foreground uppercase font-mono">
-                    {token.chain}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Price Chart */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Price Chart</h3>
-                <div className="inline-flex h-8 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-                  <button
-                    onClick={() => setActiveTimeFrame('1h')}
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                      activeTimeFrame === '1h' ? 'bg-primary text-foreground shadow-sm' : ''
-                    }`}
-                  >
-                    1H
-                  </button>
-                  <button
-                    onClick={() => setActiveTimeFrame('24h')}
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                      activeTimeFrame === '24h' ? 'bg-primary text-foreground shadow-sm' : ''
-                    }`}
-                  >
-                    24H
-                  </button>
-                  <button
-                    onClick={() => setActiveTimeFrame('7d')}
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                      activeTimeFrame === '7d' ? 'bg-primary text-foreground shadow-sm' : ''
-                    }`}
-                  >
-                    7D
-                  </button>
-                  <button
-                    onClick={() => setActiveTimeFrame('30d')}
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                      activeTimeFrame === '30d' ? 'bg-primary text-foreground shadow-sm' : ''
-                    }`}
-                  >
-                    30D
-                  </button>
-                  <button
-                    onClick={() => setActiveTimeFrame('1y')}
-                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-                      activeTimeFrame === '1y' ? 'bg-primary text-foreground shadow-sm' : ''
-                    }`}
-                  >
-                    1Y
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-accent rounded-lg p-3">
-                {isLoadingChart ? (
-                  <div className="flex items-center justify-center h-[20vh] min-h-[200px]">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : priceData.length > 0 ? (
-                  <ChartContainer config={chartConfig} className="aspect-auto h-[20vh] min-h-[200px] w-full">
-                    <AreaChart
-                      accessibilityLayer
-                      data={priceData}
-                      margin={{
-                        left: -12,
-                        right: 12,
-                        top: 12,
-                        bottom: 12,
-                      }}
-                    >
-                      <defs>
-                        <linearGradient id="fillPrice" x1="0" y1="0" x2="0" y2="1">
-                          <stop
-                            offset="5%"
-                            stopColor="var(--color-price)"
-                            stopOpacity={0.8}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="var(--color-price)"
-                            stopOpacity={0.1}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        horizontal={false}
-                        strokeDasharray="8 8"
-                        strokeWidth={2}
-                        stroke="var(--muted-foreground)"
-                        opacity={0.3}
-                      />
-                      <XAxis
-                        dataKey="timestamp"
-                        type="number"
-                        scale="time"
-                        domain={['dataMin', 'dataMax']}
-                        ticks={getEvenlySpacedTimeTicks(priceData, 10)}
-                        tickFormatter={(ts) => formatDateForTimeframe(ts, activeTimeFrame)}
-                        interval={0}
-                        tickLine={false}
-                        tickMargin={12}
-                        strokeWidth={1.5}
-                        tick={{ fontSize: 0 }}
-                      />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={0}
-                        tickCount={6}
-                        className="text-sm fill-muted-foreground"
-                        tickFormatter={formatYAxisValue}
-                        domain={[0, "dataMax"]}
-                      />
-                      <ChartTooltip
-                        cursor={false}
-                        content={
-                          <ChartTooltipContent
-                            indicator="dot"
-                            className="min-w-[200px] px-4 py-3"
-                            labelFormatter={(_, items) => {
-                              const first = Array.isArray(items) && items.length > 0 ? (items[0] as any) : undefined;
-                              const p = first && typeof first === 'object' ? (first.payload as PriceDataPoint | undefined) : undefined;
-                              return p ? formatDateForTimeframe(p.timestamp, activeTimeFrame) : '';
-                            }}
-                            formatter={(value) => `$${typeof value === 'number' ? formatPrice(value) : value}`}
-                          />
-                        }
-                      />
-                      <Area
-                        dataKey="price"
-                        type="linear"
-                        fill="url(#fillPrice)"
-                        fillOpacity={0.4}
-                        stroke="var(--color-price)"
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[20vh] min-h-[200px] text-muted-foreground">
-                    No price data available
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Additional Info */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted rounded-lg p-3">
-                <div className="text-xs text-muted-foreground mb-1">Network</div>
-                <div className="text-sm font-medium uppercase">{token.chain}</div>
-              </div>
-              {token.decimals && (
-                <div className="bg-muted rounded-lg p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Decimals</div>
-                  <div className="text-sm font-medium">{token.decimals}</div>
-                </div>
-              )}
-            </div>
+            );
+          })()}
+          <div>
+            <h2 className="text-xl font-semibold">{token.symbol}</h2>
+            <p className="text-sm text-muted-foreground">{token.name}</p>
           </div>
         </div>
       </div>
-    </div>,
-    document.body
+
+      {/* Price Info */}
+      <div className="space-y-2">
+        <div className="flex items-baseline gap-3">
+          <span className="text-3xl font-bold">${formatPrice(currentPrice)}</span>
+          {priceChange && (
+            <div className={`flex items-center gap-1 text-sm font-medium ${
+              priceChange.value >= 0 ? 'text-green-500' : 'text-red-500'
+            }`}>
+              {priceChange.value >= 0 ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              <span>
+                {priceChange.value >= 0 ? '+' : ''}{priceChange.percentage.toFixed(2)}%
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Balance: {parseFloat(token.balanceFormatted).toFixed(6)} {token.symbol} (${token.usdValue?.toFixed(2) || '0.00'})
+        </div>
+      </div>
+
+      {/* Contract Address */}
+      {token.contractAddress && (
+        <div className="bg-muted rounded-lg p-3 space-y-2">
+          <div className="text-xs text-muted-foreground uppercase font-medium">Contract Address</div>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-sm bg-background p-2 rounded border border-border overflow-x-auto scrollbar-thin">
+              {token.contractAddress}
+            </code>
+            <Button
+              onClick={handleCopyAddress}
+              variant="ghost"
+              size="sm"
+              className="flex-shrink-0"
+            >
+              {isCopied ? (
+                <Check className="w-4 h-4 text-green-500" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Chain:</span>
+            <span className="px-2 py-0.5 rounded bg-background text-foreground uppercase font-mono">
+              {token.chain}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Price Chart */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Price Chart</h3>
+          <div className="inline-flex h-8 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+            <button
+              onClick={() => setActiveTimeFrame('1h')}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                activeTimeFrame === '1h' ? 'bg-primary text-foreground shadow-sm' : ''
+              }`}
+            >
+              1H
+            </button>
+            <button
+              onClick={() => setActiveTimeFrame('24h')}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                activeTimeFrame === '24h' ? 'bg-primary text-foreground shadow-sm' : ''
+              }`}
+            >
+              24H
+            </button>
+            <button
+              onClick={() => setActiveTimeFrame('7d')}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                activeTimeFrame === '7d' ? 'bg-primary text-foreground shadow-sm' : ''
+              }`}
+            >
+              7D
+            </button>
+            <button
+              onClick={() => setActiveTimeFrame('30d')}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                activeTimeFrame === '30d' ? 'bg-primary text-foreground shadow-sm' : ''
+              }`}
+            >
+              30D
+            </button>
+            <button
+              onClick={() => setActiveTimeFrame('1y')}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+                activeTimeFrame === '1y' ? 'bg-primary text-foreground shadow-sm' : ''
+              }`}
+            >
+              1Y
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-accent rounded-lg p-3">
+          {isLoadingChart ? (
+            <div className="flex items-center justify-center h-[20vh] min-h-[200px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : priceData.length > 0 ? (
+            <ChartContainer config={chartConfig} className="aspect-auto h-[20vh] min-h-[200px] w-full">
+              <AreaChart
+                accessibilityLayer
+                data={priceData}
+                margin={{
+                  left: -12,
+                  right: 12,
+                  top: 12,
+                  bottom: 12,
+                }}
+              >
+                <defs>
+                  <linearGradient id="fillPrice" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor="var(--color-price)"
+                      stopOpacity={0.8}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="var(--color-price)"
+                      stopOpacity={0.1}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  horizontal={false}
+                  strokeDasharray="8 8"
+                  strokeWidth={2}
+                  stroke="var(--muted-foreground)"
+                  opacity={0.3}
+                />
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
+                  ticks={getEvenlySpacedTimeTicks(priceData, 10)}
+                  tickFormatter={(ts) => formatDateForTimeframe(ts, activeTimeFrame)}
+                  interval={0}
+                  tickLine={false}
+                  tickMargin={12}
+                  strokeWidth={1.5}
+                  tick={{ fontSize: 0 }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={0}
+                  tickCount={6}
+                  className="text-sm fill-muted-foreground"
+                  tickFormatter={formatYAxisValue}
+                  domain={[0, "dataMax"]}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      indicator="dot"
+                      className="min-w-[200px] px-4 py-3"
+                      labelFormatter={(_, items) => {
+                        const first = Array.isArray(items) && items.length > 0 ? (items[0] as any) : undefined;
+                        const p = first && typeof first === 'object' ? (first.payload as PriceDataPoint | undefined) : undefined;
+                        return p ? formatDateForTimeframe(p.timestamp, activeTimeFrame) : '';
+                      }}
+                      formatter={(value) => `$${typeof value === 'number' ? formatPrice(value) : value}`}
+                    />
+                  }
+                />
+                <Area
+                  dataKey="price"
+                  type="linear"
+                  fill="url(#fillPrice)"
+                  fillOpacity={0.4}
+                  stroke="var(--color-price)"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                />
+              </AreaChart>
+            </ChartContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[20vh] min-h-[200px] text-muted-foreground">
+              No price data available
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Additional Info */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-muted rounded-lg p-3">
+          <div className="text-xs text-muted-foreground mb-1">Network</div>
+          <div className="text-sm font-medium uppercase">{token.chain}</div>
+        </div>
+        {token.decimals && (
+          <div className="bg-muted rounded-lg p-3">
+            <div className="text-xs text-muted-foreground mb-1">Decimals</div>
+            <div className="text-sm font-medium">{token.decimals}</div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

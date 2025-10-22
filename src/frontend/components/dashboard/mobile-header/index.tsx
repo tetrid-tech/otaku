@@ -2,17 +2,22 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import MonkeyIcon from "@/components/icons/monkey";
 import { CDPWalletCard } from "@/components/dashboard/cdp-wallet-card";
+import { useCDPWallet } from "@/hooks/useCDPWallet";
 import type { MockData } from "@/types/dashboard";
 import { Wallet } from "lucide-react";
 
 interface MobileHeaderProps {
   mockData: MockData;
+  onHomeClick?: () => void;
 }
 
-export function MobileHeader({ mockData }: MobileHeaderProps) {
+export function MobileHeader({ mockData, onHomeClick }: MobileHeaderProps) {
+  const { currentUser } = useCDPWallet();
+  const userId = currentUser?.userId || '';
+  const walletAddress = currentUser?.evmAccounts?.[0] || undefined;
 
   return (
     <div className="lg:hidden h-header-mobile sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
@@ -21,13 +26,16 @@ export function MobileHeader({ mockData }: MobileHeaderProps) {
         <SidebarTrigger />
 
         {/* Center: Monkey Logo + Time */}
-        <div className="flex items-center gap-3">
+        <button 
+          onClick={onHomeClick}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+        >
           <div className="flex items-center gap-2">
             <div className="h-8 w-16 bg-primary rounded flex items-center justify-center">
               <MonkeyIcon className="size-6 text-primary-foreground" />
             </div>
           </div>
-        </div>
+        </button>
 
         <Sheet>
           {/* Right: Wallet Menu */}
@@ -47,6 +55,7 @@ export function MobileHeader({ mockData }: MobileHeaderProps) {
               {/* Accessibility Title */}
               <SheetHeader className="sr-only">
                 <SheetTitle>Wallet</SheetTitle>
+                <SheetDescription>View and manage your wallet</SheetDescription>
               </SheetHeader>
 
               {/* Header */}
@@ -64,7 +73,7 @@ export function MobileHeader({ mockData }: MobileHeaderProps) {
 
               {/* Wallet Content */}
               <div className="flex-1 overflow-y-auto p-4 bg-muted">
-                <CDPWalletCard />
+                {userId && <CDPWalletCard userId={userId} walletAddress={walletAddress} />}
               </div>
             </div>
           </SheetContent>

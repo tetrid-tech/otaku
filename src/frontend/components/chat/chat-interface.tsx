@@ -4,7 +4,6 @@ import { AnimatedResponse } from "@/components/chat/animated-response"
 import ArrowRightIcon from "@/components/icons/arrow-right"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { convertActionMessageToToolPart, isActionMessage } from "@/lib/action-message-utils"
 import { elizaClient } from '@/lib/elizaClient'
 import { socketManager } from '@/lib/socketManager'
@@ -13,6 +12,7 @@ import type { Agent, UUID } from '@elizaos/core'
 import { Loader2 } from "lucide-react"
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Textarea } from "../ui/textarea"
 
 // Quick start prompts for new conversations (static fallback)
 const DEFAULT_QUICK_PROMPTS = [
@@ -74,6 +74,9 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isUserScrollingRef = useRef(false) // Track if user is actively scrolling
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  
+  const MAX_TEXTAREA_HEIGHT = 160
 
   // Helper function to check if user is near bottom of the chat
   const checkIfNearBottom = () => {
@@ -90,6 +93,15 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior })
   }
+
+  // Helper function to resize textarea based on content
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, MAX_TEXTAREA_HEIGHT) + 'px'
+    }
+  }, [MAX_TEXTAREA_HEIGHT])
 
   // Track scroll position - detect when user is actively scrolling
   useEffect(() => {
@@ -110,7 +122,6 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
         const nearBottom = checkIfNearBottom()
         // User stopped scrolling - enable auto-scroll only if near bottom
         isUserScrollingRef.current = !nearBottom
-        console.log('📍 Scroll stopped. Near bottom:', nearBottom, '- isUserScrolling:', isUserScrollingRef.current)
       }, 150)
     }
 
@@ -122,6 +133,11 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
       }
     }
   }, [])
+
+  // Resize textarea when input value changes
+  useEffect(() => {
+    resizeTextarea()
+  }, [inputValue, resizeTextarea])
 
   // Clear messages when entering new chat mode
   useEffect(() => {
@@ -659,16 +675,16 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
 
             {/* Quick Prompts - Only show when no messages and not creating/typing (show if error) */}
             {messages.length === 0 && !isCreatingChannel && !isTyping && !isLoadingMessages && (
-              <div className="pt-4 border-t border-border">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3 font-mono">
+              <div className="pt-3 md:pt-4 border-t border-border">
+                <p className="text-[10px] md:text-xs uppercase tracking-wider text-muted-foreground mb-2 md:mb-3 font-mono">
                   {error ? 'Try Again' : 'Quick Start'}
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 md:gap-2">
                   {DEFAULT_QUICK_PROMPTS.map((prompt, index) => (
                     <button
                       key={index}
                       onClick={() => handleQuickPrompt(prompt)}
-                      className="px-3 py-2 text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left whitespace-normal"
+                      className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left whitespace-normal"
                     >
                       {prompt}
                     </button>
@@ -681,18 +697,24 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
         </CardContent>
       </Card>
 
-      <div className="border-t-2 border-muted bg-secondary h-12 p-1 relative">
-        <Input
+      <div className="border-t-2 border-muted bg-secondary min-h-12 p-1 relative">
+        <Textarea
+          ref={textareaRef}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Type your message..."
           disabled={isTyping || isCreatingChannel}
-          className="flex-1 rounded-none border-none text-foreground placeholder-foreground/40 text-sm font-mono"
+          className={cn(
+            "flex-1 rounded-none border-none text-foreground placeholder-foreground/40 text-sm font-mono resize-none overflow-y-auto min-h-10 py-2.5",
+            "focus-visible:outline-none focus-visible:ring-0"
+          )}
+          style={{ maxHeight: `${MAX_TEXTAREA_HEIGHT}px` }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault()
               handleSubmit(e)
             }
+            // Shift+Enter will insert a newline (default behavior)
           }}
         />
         <Button

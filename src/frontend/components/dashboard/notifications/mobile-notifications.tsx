@@ -6,7 +6,7 @@ import { Bullet } from "@/components/ui/bullet";
 import { AnimatePresence, motion, PanInfo } from "framer-motion";
 import NotificationItem from "./notification-item";
 import type { Notification } from "@/types/dashboard";
-import { SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SheetClose, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useIsV0 } from "@/lib/v0-context";
 
 interface MobileNotificationsProps {
@@ -72,6 +72,7 @@ export default function MobileNotifications({
       {/* Accessibility Title */}
       <SheetHeader className="sr-only">
         <SheetTitle>Notifications</SheetTitle>
+        <SheetDescription>View and manage your notifications</SheetDescription>
       </SheetHeader>
 
       {/* Header */}

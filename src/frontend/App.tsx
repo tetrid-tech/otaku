@@ -14,6 +14,7 @@ import AccountPage from './components/dashboard/account/page';
 import { SignInModal } from './components/auth/SignInModal';
 import { MobileHeader } from './components/dashboard/mobile-header';
 import { LoadingPanelProvider, useLoadingPanel } from './contexts/LoadingPanelContext';
+import { ModalProvider } from './contexts/ModalContext';
 import { MessageSquare } from 'lucide-react';
 import mockDataJson from './mock.json';
 import type { MockData } from './types/dashboard';
@@ -537,7 +538,7 @@ function App() {
       )}
       
       {/* Mobile Header */}
-      <MobileHeader mockData={mockData} />
+      <MobileHeader mockData={mockData} onHomeClick={() => setCurrentView('chat')} />
 
       {/* Desktop Layout - 3 columns */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-gap lg:px-sides">
@@ -647,7 +648,9 @@ export default function AppWithCDP() {
   if (!isCdpConfigured) {
     return (
       <LoadingPanelProvider>
-        <App />
+        <ModalProvider>
+          <App />
+        </ModalProvider>
       </LoadingPanelProvider>
     );
   }
@@ -663,7 +666,9 @@ export default function AppWithCDP() {
       }}
     >
       <LoadingPanelProvider>
-        <App />
+        <ModalProvider>
+          <App />
+        </ModalProvider>
       </LoadingPanelProvider>
     </CDPReactProvider>
   );

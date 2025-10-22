@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Bullet } from '../../ui/bullet';
 import { Copy, Check } from 'lucide-react';
-import { SendModal } from './SendModal';
-import { SwapModal } from './SwapModal';
-import { TokenDetailModal } from './TokenDetailModal';
-import { NFTDetailModal } from './NFTDetailModal';
+import { SendModalContent } from './SendModal';
+import { SwapModalContent } from './SwapModal';
+import { TokenDetailModalContent } from './TokenDetailModal';
+import { NFTDetailModalContent } from './NFTDetailModal';
+import { FundModalContent } from './FundModal';
 import { elizaClient } from '../../../lib/elizaClient';
 import { getTokenIconBySymbol } from '../../../constants/chains';
+import { useModal } from '../../../contexts/ModalContext';
 
 interface Token {
   symbol: string;
@@ -61,6 +62,7 @@ interface CDPWalletCardProps {
 }
 
 export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWalletCardProps) {
+  const { showModal } = useModal();
   // Format address for display (shortened)
   const shortAddress = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '';
   const [isCopied, setIsCopied] = useState(false);
@@ -82,13 +84,6 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  
-  // Modal states
-  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
-  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
-  const [isFundModalOpen, setIsFundModalOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
-  const [selectedNft, setSelectedNft] = useState<NFT | null>(null);
 
   // Fetch tokens
   const fetchTokens = async () => {
@@ -325,7 +320,16 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
           {/* Action Buttons - Before tabs */}
           <div className="grid grid-cols-3 gap-2">
             <Button 
-              onClick={() => setIsFundModalOpen(true)}
+              onClick={() => {
+                showModal(
+                  <FundModalContent 
+                    walletAddress={walletAddress}
+                    shortAddress={shortAddress}
+                  />,
+                  'fund-modal',
+                  { closeOnBackdropClick: true, className: 'max-w-md' }
+                );
+              }}
               className="flex-1"
               variant="default"
               size="sm"
@@ -333,7 +337,19 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
               Fund
             </Button>
             <Button 
-              onClick={() => setIsSendModalOpen(true)}
+              onClick={() => {
+                showModal(
+                  <SendModalContent
+                    tokens={tokens as any}
+                    userId={userId}
+                    onSuccess={() => {
+                      fetchTokens();
+                    }}
+                  />,
+                  'send-modal',
+                  { closeOnBackdropClick: true, className: 'max-w-xl' }
+                );
+              }}
               className="flex-1"
               variant="outline"
               size="sm"
@@ -342,7 +358,19 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
               Send
             </Button>
             <Button 
-              onClick={() => setIsSwapModalOpen(true)}
+              onClick={() => {
+                showModal(
+                  <SwapModalContent
+                    tokens={tokens}
+                    userId={userId}
+                    onSuccess={() => {
+                      fetchTokens();
+                    }}
+                  />,
+                  'swap-modal',
+                  { closeOnBackdropClick: true, className: 'max-w-lg' }
+                );
+              }}
               className="flex-1"
               variant="outline"
               size="sm"
@@ -414,7 +442,13 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
                 tokens.map((token, index) => (
                   <button
                     key={`${token.chain}-${token.contractAddress || token.symbol}-${index}`}
-                    onClick={() => setSelectedToken(token)}
+                    onClick={() => {
+                      showModal(
+                        <TokenDetailModalContent token={token as any} />,
+                        'token-detail-modal',
+                        { closeOnBackdropClick: true, className: 'max-w-2xl' }
+                      );
+                    }}
                     className="w-full flex items-center justify-between p-2 rounded hover:bg-muted/50 transition-colors min-w-0 cursor-pointer text-left"
                   >
                     <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
@@ -458,7 +492,23 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
                 nfts.map((nft, index) => (
                   <button
                     key={`${nft.chain}-${nft.contractAddress}-${nft.tokenId}-${index}`}
-                    onClick={() => setSelectedNft(nft)}
+                    onClick={() => {
+                      showModal(
+                        <NFTDetailModalContent
+                          nft={nft}
+                          userId={userId}
+                          onSuccess={() => {
+                            fetchNfts();
+                          }}
+                        />,
+                        'nft-detail-modal',
+                        { 
+                          closeOnBackdropClick: true, 
+                          className: 'max-w-2xl mx-4 shadow-xl',
+                          showCloseButton: false  // NFT modal has its own close button in header
+                        }
+                      );
+                    }}
                     className="w-full flex items-center gap-2 sm:gap-3 p-2 rounded hover:bg-muted/50 transition-colors min-w-0 cursor-pointer text-left"
                   >
                     <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden flex-shrink-0 border border-border/30">
@@ -592,113 +642,6 @@ export function CDPWalletCard({ userId, walletAddress, onBalanceChange }: CDPWal
           </div>
         </div>
       </CardContent>
-
-      {/* Modals */}
-      <SendModal
-        isOpen={isSendModalOpen}
-        onClose={() => setIsSendModalOpen(false)}
-        tokens={tokens as any}
-        userId={userId}
-        onSuccess={() => {
-          setIsSendModalOpen(false);
-          fetchTokens();
-        }}
-      />
-
-      <SwapModal
-        isOpen={isSwapModalOpen}
-        onClose={() => setIsSwapModalOpen(false)}
-        tokens={tokens}
-        userId={userId}
-        onSuccess={() => {
-          setIsSwapModalOpen(false);
-          fetchTokens();
-        }}
-      />
-
-      {selectedToken && (
-        <TokenDetailModal
-          isOpen={!!selectedToken}
-          onClose={() => setSelectedToken(null)}
-          token={selectedToken as any}
-        />
-      )}
-
-      {selectedNft && (
-        <NFTDetailModal
-          isOpen={!!selectedNft}
-          onClose={() => setSelectedNft(null)}
-          nft={selectedNft}
-          userId={userId}
-          onSuccess={() => {
-            setSelectedNft(null);
-            fetchNfts();
-          }}
-        />
-      )}
-
-      {/* Fund Modal */}
-      {isFundModalOpen && createPortal(
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setIsFundModalOpen(false)}
-        >
-          <div 
-            className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-hidden p-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-pop rounded-lg p-4 sm:p-6 space-y-4 max-h-[calc(90vh-0.75rem)] overflow-y-auto">
-              <h3 className="text-lg font-semibold">Fund Your Wallet</h3>
-              <p className="text-sm text-muted-foreground">
-                Transfer ETH from another wallet or exchange
-              </p>
-              
-              <div className="space-y-3">
-                {/* Copy Address */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Wallet Address
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <code className="text-xs bg-muted p-2 rounded font-mono flex-1">
-                      {shortAddress}
-                    </code>
-                    <Button
-                      onClick={() => {
-                        handleCopyAddress();
-                      }}
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0"
-                      title="Copy full address"
-                    >
-                      {isCopied ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {isCopied && (
-                    <p className="text-xs text-green-500 mt-1">
-                      Address copied to clipboard!
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <Button
-                onClick={() => setIsFundModalOpen(false)}
-                variant="ghost"
-                className="w-full"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </Card>
   );
 }
