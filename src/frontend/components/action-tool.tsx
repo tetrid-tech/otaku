@@ -42,14 +42,14 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
   }
 
   const getStateBadge = () => {
-    const baseClasses = "px-2 py-1 rounded-full text-xs font-medium"
+    const baseClasses = "px-2 py-1 rounded-md text-xs font-medium border"
     switch (state) {
       case "input-streaming":
         return (
           <span
             className={cn(
               baseClasses,
-              "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+              "bg-blue-100 text-blue-500 border-blue-500 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-400"
             )}
           >
             Processing
@@ -60,7 +60,7 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
           <span
             className={cn(
               baseClasses,
-              "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+              "bg-orange-100 text-orange-500 border-orange-500 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-400"
             )}
           >
             Ready
@@ -71,7 +71,7 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
           <span
             className={cn(
               baseClasses,
-              "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+              "bg-green-100 text-green-500 border-green-500 dark:bg-green-900/30 dark:text-green-400 dark:border-green-400"
             )}
           >
             Completed
@@ -82,7 +82,7 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
           <span
             className={cn(
               baseClasses,
-              "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              "bg-red-100 text-red-500 border-red-500 dark:bg-red-900/30 dark:text-red-400 dark:border-red-400"
             )}
           >
             Error
@@ -93,7 +93,7 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
           <span
             className={cn(
               baseClasses,
-              "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
+              "bg-gray-100 text-gray-500 border-gray-500 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-400"
             )}
           >
             Pending

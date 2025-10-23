@@ -513,7 +513,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                   const latestActionStatus = latestAction.metadata?.actionStatus || latestAction.rawMessage?.actionStatus
                   const latestActionName = latestAction.metadata?.actions?.[0] || latestAction.rawMessage?.actions?.[0] || 'action'
                   // Determine label based on state
-                  const baseClasses = "px-2 py-1 rounded-full text-xs font-medium"
+                  const baseClasses = "px-2 py-1 rounded-md text-xs font-medium border"
                   let groupLabel = (
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1">
@@ -522,7 +522,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                       <div
                         className={cn(
                           baseClasses,
-                          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 uppercase"
+                          "bg-green-100 text-green-700 border-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-400 uppercase"
                         )}
                       >
                         Completed
