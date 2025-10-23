@@ -12,7 +12,7 @@ export function memoryRouter(elizaOS: ElizaOS, serverInstance: AgentServer): exp
   const router = express.Router();
 
   // Mount agent memory management at root level
-  router.use('/', createAgentMemoryRouter(elizaOS));
+  router.use('/', createAgentMemoryRouter(elizaOS, serverInstance));
 
   // Mount group memory management
   router.use('/', createGroupMemoryRouter(elizaOS, serverInstance));

@@ -3,15 +3,16 @@ import { MemoryType, createUniqueUuid } from '@elizaos/core';
 import { validateUuid, logger } from '@elizaos/core';
 import express from 'express';
 import { sendError, sendSuccess } from '../shared/response-utils';
+import { requireAuthenticated } from '../shared/middleware';
 
 /**
  * Agent memory management functionality
  */
-export function createAgentMemoryRouter(elizaOS: ElizaOS): express.Router {
+export function createAgentMemoryRouter(elizaOS: ElizaOS, _serverInstance?: any): express.Router {
   const router = express.Router();
 
   // Get memories for a specific room
-  router.get('/:agentId/rooms/:roomId/memories', async (req, res) => {
+  router.get('/:agentId/rooms/:roomId/memories', requireAuthenticated(), async (req, res) => {
     const agentId = validateUuid(req.params.agentId);
     const roomId = validateUuid(req.params.roomId);
 
@@ -64,7 +65,7 @@ export function createAgentMemoryRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Get all memories for an agent
-  router.get('/:agentId/memories', async (req, res) => {
+  router.get('/:agentId/memories', requireAuthenticated(), async (req, res) => {
     const agentId = validateUuid(req.params.agentId);
 
     if (!agentId) {
@@ -132,7 +133,7 @@ export function createAgentMemoryRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Update a specific memory for an agent
-  router.patch('/:agentId/memories/:memoryId', async (req, res) => {
+  router.patch('/:agentId/memories/:memoryId', requireAuthenticated(), async (req, res) => {
     const agentId = validateUuid(req.params.agentId);
     const memoryId = validateUuid(req.params.memoryId);
 
@@ -202,7 +203,7 @@ export function createAgentMemoryRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Delete all memories for an agent
-  router.delete('/:agentId/memories', async (req, res) => {
+  router.delete('/:agentId/memories', requireAuthenticated(), async (req, res) => {
     try {
       const agentId = validateUuid(req.params.agentId);
 
@@ -235,7 +236,7 @@ export function createAgentMemoryRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Delete all memories for a room
-  router.delete('/:agentId/memories/all/:roomId', async (req, res) => {
+  router.delete('/:agentId/memories/all/:roomId', requireAuthenticated(), async (req, res) => {
     try {
       const agentId = validateUuid(req.params.agentId);
       const roomId = validateUuid(req.params.roomId);
@@ -273,7 +274,7 @@ export function createAgentMemoryRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Delete a specific memory for an agent
-  router.delete('/:agentId/memories/:memoryId', async (req, res) => {
+  router.delete('/:agentId/memories/:memoryId', requireAuthenticated(), async (req, res) => {
     try {
       const agentId = validateUuid(req.params.agentId);
       const memoryId = validateUuid(req.params.memoryId);

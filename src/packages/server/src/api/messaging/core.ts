@@ -4,6 +4,7 @@ import internalMessageBus from '../../bus'; // Import the bus
 import type { AgentServer } from '../../index';
 import type { MessageServiceStructure as MessageService } from '../../types';
 import { attachmentsToApiUrls } from '../../utils/media-transformer';
+import { requireAuthOrApiKey, type AuthenticatedRequest } from '../../utils/auth';
 
 const DEFAULT_SERVER_ID = '00000000-0000-0000-0000-000000000000' as UUID; // Single default server
 
@@ -14,7 +15,7 @@ export function createMessagingCoreRouter(serverInstance: AgentServer): express.
   const router = express.Router();
 
   // Endpoint for AGENT REPLIES or direct submissions to the central bus FROM AGENTS/SYSTEM
-  (router as any).post('/submit', async (req: express.Request, res: express.Response) => {
+  (router as any).post('/submit', requireAuthOrApiKey, async (req: AuthenticatedRequest, res: express.Response) => {
     const {
       channel_id,
       server_id, // This is the server_id
@@ -101,7 +102,7 @@ export function createMessagingCoreRouter(serverInstance: AgentServer): express.
     }
   });
 
-  (router as any).post('/action', async (req: express.Request, res: express.Response) => {
+  (router as any).post('/action', requireAuthOrApiKey, async (req: AuthenticatedRequest, res: express.Response) => {
     const {
       messageId,
       channel_id,
@@ -190,7 +191,7 @@ export function createMessagingCoreRouter(serverInstance: AgentServer): express.
     }
   });
 
-  (router as any).patch('/action/:id', async (req: express.Request, res: express.Response) => {
+  (router as any).patch('/action/:id', requireAuthOrApiKey, async (req: AuthenticatedRequest, res: express.Response) => {
     const { id } = req.params;
 
     if (!validateUuid(id)) {
@@ -268,7 +269,7 @@ export function createMessagingCoreRouter(serverInstance: AgentServer): express.
   });
 
   // Endpoint for INGESTING messages from EXTERNAL platforms (e.g., Discord plugin)
-  (router as any).post('/ingest-external', async (req: express.Request, res: express.Response) => {
+  (router as any).post('/ingest-external', requireAuthOrApiKey, async (req: AuthenticatedRequest, res: express.Response) => {
     const messagePayload = req.body as Partial<MessageService>; // Partial because ID, created_at will be generated
 
     if (

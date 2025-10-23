@@ -2,6 +2,7 @@ import type { ElizaOS, Room } from '@elizaos/core';
 import { validateUuid, logger, createUniqueUuid, ChannelType } from '@elizaos/core';
 import express from 'express';
 import { sendError, sendSuccess } from '../shared/response-utils';
+import { requireAuthenticated } from '../shared/middleware';
 
 interface CustomRequest extends express.Request {
   params: {
@@ -17,7 +18,7 @@ export function createRoomManagementRouter(elizaOS: ElizaOS): express.Router {
   const router = express.Router();
 
   // Create a new room for an agent
-  router.post('/:agentId/rooms', async (req, res) => {
+  router.post('/:agentId/rooms', requireAuthenticated(), async (req, res) => {
     const agentId = validateUuid(req.params.agentId);
     if (!agentId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid agent ID format');
@@ -98,7 +99,7 @@ export function createRoomManagementRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Get all rooms where an agent is a participant
-  router.get('/:agentId/rooms', async (req, res) => {
+  router.get('/:agentId/rooms', requireAuthenticated(), async (req, res) => {
     const agentId = validateUuid(req.params.agentId);
     if (!agentId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid agent ID format');
@@ -142,7 +143,7 @@ export function createRoomManagementRouter(elizaOS: ElizaOS): express.Router {
   });
 
   // Get room details
-  router.get('/:agentId/rooms/:roomId', async (req: CustomRequest, res: express.Response) => {
+  router.get('/:agentId/rooms/:roomId', requireAuthenticated(), async (req: CustomRequest, res: express.Response) => {
     const agentId = validateUuid(req.params.agentId);
     const roomId = validateUuid(req.params.roomId);
 

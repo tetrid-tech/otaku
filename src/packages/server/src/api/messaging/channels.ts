@@ -1,5 +1,4 @@
 import {
-  composePromptFromState,
   ElizaOS,
   ModelType,
   ChannelType,
@@ -13,7 +12,8 @@ import express from 'express';
 import internalMessageBus from '../../bus';
 import type { AgentServer } from '../../index';
 import type { MessageServiceStructure as MessageService } from '../../types';
-import { createUploadRateLimit, createFileSystemRateLimit } from '../shared/middleware';
+import { createUploadRateLimit, createFileSystemRateLimit, requireAuthenticated, requireChannelParticipant } from '../shared/middleware';
+import { type AuthenticatedRequest } from '../../utils/auth';
 import { MAX_FILE_SIZE, ALLOWED_MEDIA_MIME_TYPES } from '../shared/constants';
 
 import multer from 'multer';
@@ -76,10 +76,16 @@ export function createChannelsRouter(
 ): express.Router {
   const router = express.Router();
 
+  // Helper to fetch participants for membership checks
+  const getParticipants = async (channelId: UUID) =>
+    await serverInstance.getChannelParticipants(channelId as UUID);
+
   // GUI posts NEW messages from a user here
   (router as any).post(
     '/central-channels/:channelId/messages',
-    async (req: express.Request, res: express.Response) => {
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
+    async (req: AuthenticatedRequest, res: express.Response) => {
       const channelIdParam = validateUuid(req.params.channelId);
       const {
         author_id, // This is the GUI user's central ID
@@ -99,6 +105,11 @@ export function createChannelsRouter(
           success: false,
           error: 'Missing required fields: channelId, server_id, author_id, content',
         });
+      }
+
+      // Ensure authenticated user is the author unless server-authenticated
+      if (!req.isServerAuthenticated && req.userId !== author_id) {
+        return res.status(403).json({ success: false, error: 'Forbidden: author_id does not match authenticated user' });
       }
 
       try {
@@ -273,6 +284,8 @@ export function createChannelsRouter(
   // GET messages for a central channel
   (router as any).get(
     '/central-channels/:channelId/messages',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       const limit = req.query.limit ? Number.parseInt(req.query.limit as string, 10) : 50;
@@ -352,7 +365,7 @@ export function createChannelsRouter(
   );
 
   // POST /channels - Create a new central channel
-  (router as any).post('/channels', async (req: express.Request, res: express.Response) => {
+  (router as any).post('/channels', requireAuthenticated(), async (req: express.Request, res: express.Response) => {
     const serverId = req.body.serverId as UUID;
     const { name, type, sourceType, sourceId, metadata } = req.body;
     const topic = req.body.topic ?? req.body.description;
@@ -406,9 +419,9 @@ export function createChannelsRouter(
   });
 
   // GET /dm-channel?targetUserId=<target_user_id>
-  (router as any).get('/dm-channel', async (req: express.Request, res: express.Response) => {
+  (router as any).get('/dm-channel', requireAuthenticated(), async (req: AuthenticatedRequest, res: express.Response) => {
     const targetUserId = validateUuid(req.query.targetUserId as string);
-    const currentUserId = validateUuid(req.query.currentUserId as string);
+    const currentUserId = validateUuid((req.userId || '') as string);
     const providedDmServerId =
       req.query.dmServerId === DEFAULT_SERVER_ID
         ? DEFAULT_SERVER_ID
@@ -462,7 +475,7 @@ export function createChannelsRouter(
   });
 
   // POST /central-channels (for creating group channels)
-  (router as any).post('/central-channels', async (req: express.Request, res: express.Response) => {
+  (router as any).post('/central-channels', requireAuthenticated(), async (req: express.Request, res: express.Response) => {
     const {
       name,
       participantCentralUserIds,
@@ -519,6 +532,8 @@ export function createChannelsRouter(
   // Get channel details
   (router as any).get(
     '/central-channels/:channelId/details',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       if (!channelId) {
@@ -543,6 +558,8 @@ export function createChannelsRouter(
   // Get channel participants
   (router as any).get(
     '/central-channels/:channelId/participants',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       if (!channelId) {
@@ -564,6 +581,8 @@ export function createChannelsRouter(
   // POST /central-channels/:channelId/agents - Add agent to channel
   (router as any).post(
     '/central-channels/:channelId/agents',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       const { agentId } = req.body;
@@ -618,6 +637,8 @@ export function createChannelsRouter(
   // DELETE /central-channels/:channelId/agents/:agentId - Remove agent from channel
   (router as any).delete(
     '/central-channels/:channelId/agents/:agentId',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       const agentId = validateUuid(req.params.agentId);
@@ -682,6 +703,8 @@ export function createChannelsRouter(
   // GET /central-channels/:channelId/agents - List agents in channel
   (router as any).get(
     '/central-channels/:channelId/agents',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
 
@@ -725,6 +748,8 @@ export function createChannelsRouter(
   // Delete single message
   (router as any).delete(
     '/central-channels/:channelId/messages/:messageId',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       const messageId = validateUuid(req.params.messageId);
@@ -768,6 +793,8 @@ export function createChannelsRouter(
   // Clear all messages in channel
   (router as any).delete(
     '/central-channels/:channelId/messages',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       if (!channelId) {
@@ -806,6 +833,8 @@ export function createChannelsRouter(
   // Update channel
   (router as any).patch(
     '/central-channels/:channelId',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       if (!channelId) {
@@ -839,6 +868,8 @@ export function createChannelsRouter(
   // Delete entire channel
   (router as any).delete(
     '/central-channels/:channelId',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       if (!channelId) {
@@ -887,6 +918,8 @@ export function createChannelsRouter(
     createUploadRateLimit(),
     createFileSystemRateLimit(),
     channelUploadMiddleware.single('file'),
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       if (!channelId) {
@@ -941,6 +974,7 @@ export function createChannelsRouter(
   // Generate title from user message (for new chats)
   (router as any).post(
     '/generate-title',
+    requireAuthenticated(),
     async (req: express.Request, res: express.Response) => {
       const { userMessage, agentId } = req.body;
 
@@ -1032,6 +1066,8 @@ Respond with just the title, nothing else.
   // Generate dynamic quick start prompts based on recent messages
   (router as any).post(
     '/central-channels/:channelId/generate-prompts',
+    requireAuthenticated(),
+    requireChannelParticipant(getParticipants),
     async (req: express.Request, res: express.Response) => {
       const channelId = validateUuid(req.params.channelId);
       const { agentId, count = 4 } = req.body;

@@ -10,6 +10,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AgentServer, CentralRootMessage } from '../../index';
 import { transformMessageAttachments } from '../../utils/media-transformer';
+import { requireAuthOrApiKey, type AuthenticatedRequest } from '../../utils/auth';
 import type {
   Session,
   SessionTimeoutConfig,
@@ -519,7 +520,7 @@ function asyncHandler(fn: AsyncRequestHandler): express.RequestHandler {
  * @returns Router with cleanup method to prevent memory leaks
  */
 export function createSessionsRouter(elizaOS: ElizaOS, serverInstance: AgentServer): SessionRouter {
-  const router = express.Router();
+  const router = express.Router() as unknown as SessionRouter;
 
   /**
    * Health check - placed before parameterized routes to avoid conflicts
@@ -566,7 +567,8 @@ export function createSessionsRouter(elizaOS: ElizaOS, serverInstance: AgentServ
    */
   router.post(
     '/sessions',
-    asyncHandler(async (req: express.Request, res: express.Response) => {
+    requireAuthOrApiKey,
+    asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
       const body: CreateSessionRequest = req.body;
 
       // Validate request structure
@@ -667,7 +669,8 @@ export function createSessionsRouter(elizaOS: ElizaOS, serverInstance: AgentServ
    */
   router.get(
     '/sessions/:sessionId',
-    asyncHandler(async (req: express.Request, res: express.Response) => {
+    requireAuthOrApiKey,
+    asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
       const { sessionId } = req.params;
       const session = sessions.get(sessionId);
 
@@ -692,7 +695,8 @@ export function createSessionsRouter(elizaOS: ElizaOS, serverInstance: AgentServ
    */
   router.post(
     '/sessions/:sessionId/messages',
-    asyncHandler(async (req: express.Request, res: express.Response) => {
+    requireAuthOrApiKey,
+    asyncHandler(async (req: AuthenticatedRequest, res: express.Response) => {
       const { sessionId } = req.params;
       const body: SendMessageRequest = req.body;
 

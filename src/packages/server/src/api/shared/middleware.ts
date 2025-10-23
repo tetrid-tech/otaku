@@ -4,6 +4,7 @@ import { validateUuid, logger } from '@elizaos/core';
 import { sendError } from './response-utils';
 import { validateChannelId } from './validation';
 import rateLimit from 'express-rate-limit';
+import { type AuthenticatedRequest, requireAuthOrApiKey } from '../../utils/auth';
 
 /**
  * Middleware to validate that an agent exists
@@ -80,6 +81,53 @@ export const validateChannelIdMiddleware = () => {
     req.params.channelId = validatedChannelId;
     next();
   };
+};
+
+/**
+ * Middleware to require that the requester is a participant of the channel
+ * Accepts either JWT-authenticated user (req.userId) or server-auth (X-API-KEY)
+ */
+export const requireChannelParticipant = (
+  getParticipants: (channelId: UUID) => Promise<UUID[]>
+) => {
+  return async (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) => {
+    // First ensure authenticated via JWT or API key
+    requireAuthOrApiKey(req, res, async () => {
+      const channelId = req.params.channelId;
+      if (!channelId) {
+        return sendError(res, 400, 'MISSING_CHANNEL_ID', 'Channel ID is required');
+      }
+
+      // If server-authenticated, allow bypass (internal system calls)
+      if (req.isServerAuthenticated) {
+        return next();
+      }
+
+      const userId = req.userId;
+      if (!userId) {
+        return sendError(res, 401, 'UNAUTHORIZED', 'Authentication required');
+      }
+
+      try {
+        const participants = await getParticipants(channelId as unknown as UUID);
+        if (!participants.includes(userId as unknown as UUID)) {
+          return sendError(res, 403, 'FORBIDDEN', 'You are not a participant of this channel');
+        }
+        next();
+      } catch (error) {
+        logger.error('[SECURITY] Error verifying channel participation:', error instanceof Error ? error.message : String(error));
+        return sendError(res, 500, 'INTERNAL_ERROR', 'Failed to verify channel participation');
+      }
+    });
+  };
+};
+
+/**
+ * Convenience middleware: require authenticated user or API key
+ */
+export const requireAuthenticated = () => {
+  return (req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) =>
+    requireAuthOrApiKey(req, res, next);
 };
 
 /**

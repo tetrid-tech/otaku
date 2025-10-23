@@ -1,5 +1,6 @@
 import { logger, recentLogs } from '@elizaos/core';
 import express from 'express';
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from '../../utils/auth';
 
 // Custom levels from @elizaos/core logger
 const LOG_LEVELS = {
@@ -31,12 +32,16 @@ interface LogEntry {
 
 /**
  * Logging management endpoints
+ * SECURITY: All logging endpoints require admin access
  */
 export function createLoggingRouter(): express.Router {
   const router = express.Router();
 
-  // Logs endpoint handler
-  const logsHandler = async (req: express.Request, res: express.Response) => {
+  // Require admin for all logging endpoints
+  router.use(requireAuth, requireAdmin);
+
+  // Logs endpoint handler - ADMIN ONLY
+  const logsHandler = async (req: AuthenticatedRequest, res: express.Response) => {
     const since = req.query.since ? Number(req.query.since) : Date.now() - 3600000; // Default 1 hour
     const requestedLevel = (req.query.level?.toString().toLowerCase() || 'all') as LogLevel;
     const requestedAgentName = req.query.agentName?.toString() || 'all';
@@ -176,8 +181,8 @@ export function createLoggingRouter(): express.Router {
   (router as any).get('/logs', logsHandler);
   (router as any).post('/logs', logsHandler);
 
-  // Handler for clearing logs
-  const logsClearHandler = (_req: express.Request, res: express.Response) => {
+  // Handler for clearing logs - ADMIN ONLY
+  const logsClearHandler = (_req: AuthenticatedRequest, res: express.Response) => {
     try {
       // Clear the logs using the logger's clear method
       logger.clear();

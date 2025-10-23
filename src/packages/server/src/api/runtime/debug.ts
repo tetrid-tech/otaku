@@ -1,14 +1,19 @@
 import express from 'express';
 import type { AgentServer } from '../../index';
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from '../../utils/auth';
 
 /**
  * Debug and diagnostic endpoints
+ * SECURITY: All debug endpoints require admin access
  */
 export function createDebugRouter(serverInstance: AgentServer): express.Router {
   const router = express.Router();
 
-  // Debug endpoint to check message servers
-  router.get('/servers', async (_req, res) => {
+  // Require admin for all debug endpoints
+  router.use(requireAuth, requireAdmin);
+
+  // Debug endpoint to check message servers - ADMIN ONLY
+  router.get('/servers', async (_req: AuthenticatedRequest, res) => {
     try {
       const servers = await serverInstance?.getServers();
       res.json({

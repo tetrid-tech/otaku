@@ -1,6 +1,7 @@
 import type { ElizaOS } from '@elizaos/core';
 import { logger } from '@elizaos/core';
 import express from 'express';
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from '../../utils/auth';
 import type { AgentServer } from '../../index';
 
 /**
@@ -50,8 +51,8 @@ export function createHealthRouter(elizaOS: ElizaOS, serverInstance: AgentServer
     res.status(statusCode).json(healthcheck);
   });
 
-  // Server stop endpoint
-  router.post('/stop', (_req, res) => {
+  // Server stop endpoint (admin only)
+  router.post('/stop', requireAuth as any, requireAdmin as any, (_req: AuthenticatedRequest, res) => {
     logger.log({ apiRoute: '/stop' }, 'Server stopping...');
     serverInstance?.stop(); // Use optional chaining in case server is undefined
     res.json({ message: 'Server stopping...' });

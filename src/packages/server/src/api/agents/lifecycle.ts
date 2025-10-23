@@ -3,6 +3,7 @@ import { validateUuid, logger } from '@elizaos/core';
 import express from 'express';
 import type { AgentServer } from '../../index';
 import { sendError, sendSuccess } from '../shared/response-utils';
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from '../../utils/auth';
 
 /**
  * Agent lifecycle operations (start, stop, status)
@@ -14,8 +15,8 @@ export function createAgentLifecycleRouter(
   const router = express.Router();
   const db = serverInstance?.database;
 
-  // Start an existing agent
-  router.post('/:agentId/start', async (req, res) => {
+  // Start an existing agent - ADMIN ONLY
+  router.post('/:agentId/start', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     const agentId = validateUuid(req.params.agentId);
     if (!agentId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid agent ID format');
@@ -72,8 +73,8 @@ export function createAgentLifecycleRouter(
     }
   });
 
-  // Stop an existing agent
-  router.post('/:agentId/stop', async (req, res) => {
+  // Stop an existing agent - ADMIN ONLY
+  router.post('/:agentId/stop', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     const agentId = validateUuid(req.params.agentId);
     if (!agentId) {
       logger.debug('[AGENT STOP] Invalid agent ID format');

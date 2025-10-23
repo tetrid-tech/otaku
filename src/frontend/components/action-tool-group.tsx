@@ -19,7 +19,7 @@ const ToolGroup = ({
   children, 
   defaultOpen = false, 
   className,
-  label = "See working steps",
+  label = "See execution steps",
   animate = false
 }: ToolGroupProps) => {
   const [isOpen, setIsOpen] = useState(defaultOpen)

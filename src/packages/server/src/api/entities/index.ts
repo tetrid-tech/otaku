@@ -2,6 +2,7 @@ import { Entity, logger, validateUuid } from '@elizaos/core';
 import express from 'express';
 import type { AgentServer } from '../../index';
 import { sendError, sendSuccess } from '../shared/response-utils';
+import { requireAuth, type AuthenticatedRequest } from '../../utils/auth';
 
 /**
  * Entity management endpoints
@@ -11,7 +12,8 @@ export function entitiesRouter(serverInstance: AgentServer): express.Router {
   const db = serverInstance?.database;
 
   // GET /entities/:entityId - Get entity by ID
-  router.get('/:entityId', async (req, res) => {
+  // SECURITY: Users can only get their own entity unless they're admin
+  router.get('/:entityId', requireAuth, async (req: AuthenticatedRequest, res) => {
     const entityId = validateUuid(req.params.entityId);
     if (!entityId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid entity ID format');
@@ -19,6 +21,12 @@ export function entitiesRouter(serverInstance: AgentServer): express.Router {
 
     if (!db) {
       return sendError(res, 500, 'DB_ERROR', 'Database not available');
+    }
+
+    // SECURITY: Check if user is requesting their own entity or is admin
+    if (!req.isAdmin && entityId !== req.userId) {
+      logger.warn(`[ENTITY GET] User ${req.userId} attempted to access entity ${entityId}`);
+      return sendError(res, 403, 'FORBIDDEN', 'You can only access your own entity');
     }
 
     try {
@@ -45,7 +53,8 @@ export function entitiesRouter(serverInstance: AgentServer): express.Router {
   });
 
   // POST /entities - Create a new entity
-  router.post('/', async (req, res) => {
+  // SECURITY: Users can only create entities for themselves unless they're admin
+  router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
     const { id, agentId, names, metadata } = req.body;
 
     if (!id) {
@@ -55,6 +64,12 @@ export function entitiesRouter(serverInstance: AgentServer): express.Router {
     const entityId = validateUuid(id);
     if (!entityId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid entity ID format');
+    }
+
+    // SECURITY: Check if user is creating their own entity or is admin
+    if (!req.isAdmin && entityId !== req.userId) {
+      logger.warn(`[ENTITY CREATE] User ${req.userId} attempted to create entity ${entityId}`);
+      return sendError(res, 403, 'FORBIDDEN', 'You can only create your own entity');
     }
 
     if (!agentId) {
@@ -101,10 +116,17 @@ export function entitiesRouter(serverInstance: AgentServer): express.Router {
   });
 
   // PATCH /entities/:entityId - Update an entity
-  router.patch('/:entityId', async (req, res) => {
+  // SECURITY: Users can only update their own entity unless they're admin
+  router.patch('/:entityId', requireAuth, async (req: AuthenticatedRequest, res) => {
     const entityId = validateUuid(req.params.entityId);
     if (!entityId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid entity ID format');
+    }
+
+    // SECURITY: Check if user is updating their own entity or is admin
+    if (!req.isAdmin && entityId !== req.userId) {
+      logger.warn(`[ENTITY UPDATE] User ${req.userId} attempted to update entity ${entityId}`);
+      return sendError(res, 403, 'FORBIDDEN', 'You can only update your own entity');
     }
 
     if (!db) {

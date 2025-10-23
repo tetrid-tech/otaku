@@ -517,7 +517,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                   let groupLabel = (
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-1">
-                        See working steps
+                        See execution steps
                       </div>
                       <div
                         className={cn(

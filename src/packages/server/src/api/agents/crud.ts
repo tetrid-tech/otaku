@@ -10,6 +10,7 @@ import {
 import express from 'express';
 import type { AgentServer } from '../../index';
 import { sendError, sendSuccess } from '../shared/response-utils';
+import { requireAuth, requireAdmin, type AuthenticatedRequest } from '../../utils/auth';
 
 /**
  * Agent CRUD operations
@@ -21,8 +22,8 @@ export function createAgentCrudRouter(
   const router = express.Router();
   const db = serverInstance?.database;
 
-  // List all agents with minimal details
-  router.get('/', async (_, res) => {
+  // List all agents with minimal details (public)
+  router.get('/', async (_: express.Request, res) => {
     try {
       if (!db) {
         return sendError(res, 500, 'DB_ERROR', 'Database not available');
@@ -63,8 +64,8 @@ export function createAgentCrudRouter(
     }
   });
 
-  // Get specific agent details
-  router.get('/:agentId', async (req, res) => {
+  // Get specific agent details (public)
+  router.get('/:agentId', async (req: express.Request, res) => {
     const agentId = validateUuid(req.params.agentId);
     if (!agentId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid agent ID format');
@@ -80,8 +81,19 @@ export function createAgentCrudRouter(
       }
 
       const runtime = elizaOS.getAgent(agentId);
+      // Sanitize sensitive fields before returning publicly
+      const { settings, ...rest } = agent as any;
+      const safeSettings = settings
+        ? {
+            ...settings,
+            // Never expose secrets
+            secrets: undefined,
+          }
+        : undefined;
+
       const response = {
-        ...agent,
+        ...rest,
+        ...(safeSettings ? { settings: safeSettings } : {}),
         status: runtime ? 'active' : 'inactive',
       };
 
@@ -101,8 +113,8 @@ export function createAgentCrudRouter(
     }
   });
 
-  // Create new agent
-  router.post('/', async (req, res) => {
+  // Create new agent - ADMIN ONLY
+  router.post('/', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     logger.debug('[AGENT CREATE] Creating new agent');
     const { characterPath, characterJson, agent } = req.body;
     if (!db) {
@@ -178,8 +190,8 @@ export function createAgentCrudRouter(
     }
   });
 
-  // Update agent
-  router.patch('/:agentId', async (req, res) => {
+  // Update agent - ADMIN ONLY
+  router.patch('/:agentId', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     const agentId = validateUuid(req.params.agentId);
     if (!agentId) {
       return sendError(res, 400, 'INVALID_ID', 'Invalid agent ID format');
@@ -310,8 +322,8 @@ export function createAgentCrudRouter(
     }
   });
 
-  // Delete agent
-  router.delete('/:agentId', async (req, res) => {
+  // Delete agent - ADMIN ONLY
+  router.delete('/:agentId', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res) => {
     logger.debug(`[AGENT DELETE] Received request to delete agent with ID: ${req.params.agentId}`);
 
     const agentId = validateUuid(req.params.agentId);

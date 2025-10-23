@@ -84,6 +84,7 @@ export class MessageBusService extends Service {
   }
 
   private validChannelIds: Set<UUID> = new Set();
+  private cachedAgentToken: string | null = null;
 
   private async fetchValidChannelIds(): Promise<void> {
     try {
@@ -975,13 +976,67 @@ export class MessageBusService extends Service {
       'Content-Type': 'application/json',
     };
 
-    // Add authentication header if ELIZA_SERVER_AUTH_TOKEN is configured
+    // Try X-API-KEY first if ELIZA_SERVER_AUTH_TOKEN is configured
     const serverAuthToken = process.env.ELIZA_SERVER_AUTH_TOKEN;
     if (serverAuthToken) {
       headers['X-API-KEY'] = serverAuthToken;
+    } else {
+      // Fallback: Use agent JWT token for internal server-to-server communication
+      // Generate a long-lived JWT token for the agent to access its own resources
+      const agentToken = this.generateAgentAuthToken();
+      if (agentToken) {
+        headers['Authorization'] = `Bearer ${agentToken}`;
+      }
     }
 
     return headers;
+  }
+
+  private generateAgentAuthToken(): string | null {
+    // Return cached token if available
+    if (this.cachedAgentToken) {
+      return this.cachedAgentToken;
+    }
+
+    try {
+      const JWT_SECRET = process.env.JWT_SECRET;
+      if (!JWT_SECRET) {
+        logger.warn(
+          `[${this.runtime.character.name}] MessageBusService: JWT_SECRET not set, cannot generate agent auth token`
+        );
+        return null;
+      }
+
+      // Import jwt dynamically to avoid circular dependencies
+      const jwt = require('jsonwebtoken');
+
+      // Generate a long-lived token for the agent (30 days)
+      // This token represents the agent itself, not a user
+      const token = jwt.sign(
+        {
+          userId: this.runtime.agentId, // Use agent ID as user ID
+          email: `agent+${this.runtime.agentId}@system.local`,
+          username: this.runtime.character.name || 'Agent',
+          isAgent: true, // Mark this as an agent token
+        },
+        JWT_SECRET,
+        { expiresIn: '30d' }
+      );
+
+      // Cache the token
+      this.cachedAgentToken = token;
+      logger.debug(
+        `[${this.runtime.character.name}] MessageBusService: Generated and cached agent auth token`
+      );
+
+      return token;
+    } catch (error) {
+      logger.error(
+        `[${this.runtime.character.name}] MessageBusService: Error generating agent auth token:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      return null;
+    }
   }
 
   getCentralMessageServerUrl(): string {
