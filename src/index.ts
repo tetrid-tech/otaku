@@ -8,7 +8,8 @@ import cdpPlugin from './plugins/plugin-cdp/index.ts';
 import coingeckoPlugin from './plugins/plugin-coingecko/src/index.ts';
 import webSearchPlugin from './plugins/plugin-web-search/src/index.ts';
 import defiLlamaPlugin from './plugins/plugin-defillama/src/index.ts';
-import relayPlugin from './plugins/plugin-relay/src/index.ts';
+import relayPlugin from './plugins/plugin-relay/src/index.ts';  
+import openrouterPlugin from '@elizaos/plugin-openrouter';
 
 const initCharacter = ({ runtime }: { runtime: IAgentRuntime }) => {
   logger.info('Initializing character');
@@ -22,6 +23,7 @@ export const projectAgent: ProjectAgent = {
   plugins: [
     sqlPlugin, 
     bootstrapPlugin, 
+    openrouterPlugin,
     openaiPlugin, 
     cdpPlugin, 
     coingeckoPlugin, 
