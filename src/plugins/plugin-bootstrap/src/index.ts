@@ -100,45 +100,76 @@ Determine the next step the assistant should take in this conversation to help t
 
 {{recentMessages}}
 
-# Multi-Step Workflow
+# Decision Process (Follow in Order)
 
-In each step, decide:
+## 1. Understand Current State
+- **Latest user message**: What is the user asking for RIGHT NOW? This is your primary objective.
+- **Prior step results**: Review {{actionResults}} below. What information do you already have? What worked? What failed?
+- **Change detection**: Did the user's latest message change the goal, add constraints, or provide new information?
 
-1. **Which action (if any)** should be executed after providers return.
-2. **Extract the parameters** needed for that action from the conversation context.
-3. Decide whether the task is complete. If so, set \`isFinish: true\`.
+## 2. Check for Redundancy (CRITICAL)
+- Before choosing any provider or action, scan {{actionResults}} to see if you already have the needed information.
+- Do NOT repeat a provider/action with identical parameters unless:
+  * The user explicitly requested a refresh/retry
+  * Prior step failed and you're using different parameters
+  * New information changes the context significantly
+- If you decide to repeat, explain WHY in your thought (reference what changed).
 
-You can select at most **one action** per step.
+## 3. Identify Missing Information
+- What data is required to fulfill the user's request?
+- Which providers can fetch this data?
+- Is the information already available in prior results? If yes, skip the provider.
 
-If the task is fully resolved and no further steps are needed, mark the step as \`isFinish: true\`.
+## 4. Choose Next Action
+- Based on available information (from prior results or new provider data), what action moves the user toward their goal?
+- Extract parameters from the **latest user message first**, then prior results.
+- Use exact parameter names from the action's schema.
+- If you have everything needed to complete the task, set \`isFinish: true\` instead of choosing another action.
 
 ---
 
 {{actionsWithDescriptions}}
 
-These are the actions calls that have already been used in this run. Use this to avoid redundancy and guide your next move.
+---
+
+# Prior Step Results (Use This to Avoid Redundancy)
 
 {{actionResults}}
 
+**Read these results carefully before proceeding. They contain data you may already have.**
+
+---
+
+# Decision Rules
+
+1. **Recency Priority**: Latest user message > Prior results > Earlier context
+2. **One Action Per Step**: Select at most one action (or none if gathering info via providers only)
+3. **No Premature Finish**: Do NOT set \`isFinish: true\` immediately after calling an action; wait for results first
+4. **Ground in Evidence**: Parameters must come from the latest message or prior results, not assumptions
+5. **Efficiency**: If you already have the answer from prior steps, go straight to \`isFinish: true\`
+
+---
+
 <keys>
-"thought" Clearly explain your reasoning for the selected action and parameters, and how this step contributes to resolving the user's request.
-"action"  Name of the action to execute (must be selected from the list of **Available Actions** shown above; can be empty if no action is needed).
-"parameters" JSON object containing the parameters for the action. Follow the parameter schema defined in the action above. Extract values from the conversation context. Required parameters must be provided. If the action has "Parameters: None", provide an empty object: {}
-"isFinish" Set to true only if the task is fully complete.
+"thought" Start by quoting the latest user request. Then summarize relevant prior results. State what's missing (if anything). Explain your chosen provider/action and why parameters are appropriate. If repeating work, justify the change.
+"action"  Name of the action to execute (from **Available Actions** above; empty string if no action needed this step).
+"parameters" JSON object with exact parameter names from action schema. Extract from latest user message and prior results. Empty object {} if action has no parameters.
+"isFinish" Set to true ONLY if the user's request is fully satisfied with available information.
 </keys>
 
-⚠️ IMPORTANT: 
-- Extract all required parameters from the user's message and conversation context
-- Follow the exact parameter names and types defined in the action's parameter schema
-- If an action says "Parameters: None", provide an empty parameters object: {}
-- Do **not** mark the task as \`isFinish: true\` immediately after calling an action. Wait for the action to complete before deciding the task is finished.
+⚠️ CRITICAL CHECKS:
+- Did I review the latest user message as top priority?
+- Did I check {{actionResults}} to avoid repeating work?
+- Are my parameters extracted from recent evidence (not guessed)?
+- If I'm repeating a provider/action, did I justify it in my thought?
+- Am I marking isFinish only when the task is truly complete?
 
-- Your final output MUST be in this XML format:
+Your final output MUST be in this XML format:
 
 <output>
 <response>
-  <thought>Your thought here</thought>
-  <action>ACTION</action>
+  <thought>Your structured reasoning here</thought>
+  <action>ACTION_NAME</action>
   <parameters>
     {
       "param1": "value1",
@@ -150,7 +181,7 @@ These are the actions calls that have already been used in this run. Use this to
 </output>`;
 
 export const multiStepSummaryTemplate = `<task>
-Summarize what the assistant has done so far and provide a final response to the user based on the completed steps.
+Generate a final, user-facing response based on what the assistant accomplished and the results obtained.
 </task>
 
 # Context Information
@@ -172,24 +203,38 @@ Summarize what the assistant has done so far and provide a final response to the
 
 {{recentMessages}}
 
-# Execution Trace
-Here are the actions taken by the assistant to fulfill the request:
+---
+
+# Execution Trace (What Was Done)
 {{actionResults}}
+
+**These are the steps taken and their results. Use successful results to answer the user; acknowledge failures if relevant.**
+
+---
 
 {{actionsWithDescriptions}}
 
-# Assistant’s Last Reasoning Step
+---
+
+# Assistant's Last Reasoning Step
 {{recentMessage}}
+
+---
 
 # Instructions
 
-- Generate a concise, helpful message that acknowledges the agent's capabilities and next best steps.
+1. **Review the latest user message**: What did they originally ask for?
+2. **Check execution results**: What data/outcomes did the actions produce? Focus on successful results.
+3. **Synthesize answer**: Provide a clear, direct response using the information gathered. If results are insufficient or actions failed, explain what happened and suggest next steps.
+4. **Be concise and helpful**: Users want answers, not a list of what you did. Lead with the result, not the process.
 
-- Your final output MUST be in this XML format:
+**Tone**: Professional, direct, and focused on delivering value. Avoid overly technical jargon unless the user expects it.
+
+Your final output MUST be in this XML format:
 <output>
 <response>
-  <thought>Your thought here</thought>
-  <text>Your final message to the user</text>
+  <thought>Briefly summarize the user's request and the key results obtained. Note any gaps or issues.</thought>
+  <text>Your direct, helpful answer to the user based on the results. Lead with the information they asked for.</text>
 </response>
 </output>
 `;
