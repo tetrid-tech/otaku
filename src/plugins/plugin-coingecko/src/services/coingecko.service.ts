@@ -352,6 +352,295 @@ export class CoinGeckoService extends Service {
       return ids;
     }
   }
+
+  /**
+   * Get trending tokens/pools from GeckoTerminal API for a specific network
+   * Note: GeckoTerminal API does not have a Pro tier, uses public API only.
+   */
+  async getTrendingTokens(network: string = "base", limit: number = 10): Promise<any> {
+    const baseUrl = "https://api.geckoterminal.com/api/v2";
+    const page = 1;
+    const clampedLimit = Math.max(1, Math.min(30, limit));
+
+    const url = `${baseUrl}/networks/${network}/trending_pools?include=base_token,quote_token&page=${page}&limit=${clampedLimit}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      logger.debug(`[CoinGecko] GET ${url}`);
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "ElizaOS-CoinGecko-Plugin/1.0",
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const body = await safeReadJson(res);
+        const msg = `GeckoTerminal API error ${res.status}: ${res.statusText}${body ? ` - ${JSON.stringify(body)}` : ""}`;
+        logger.warn(`[CoinGecko] trending tokens request failed for ${network}: ${msg}`);
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+
+      // Create a map of tokens by their ID for quick lookup
+      const tokenMap = new Map<string, any>();
+      const included = Array.isArray((data as any).included) ? (data as any).included : [];
+      
+      included
+        .filter((item: any) => item.type === "token")
+        .forEach((token: any) => {
+          const attrs = token.attributes || {};
+          tokenMap.set(token.id, {
+            name: attrs.name || null,
+            symbol: attrs.symbol || null,
+            decimals: attrs.decimals || null,
+            image: attrs.image_url || null,
+            coingecko_coin_id: attrs.coingecko_coin_id || null,
+            address: attrs.address || null,
+          });
+        });
+
+      // Parse and format the response - flatten pools with base token data
+      const pools = Array.isArray((data as any).data) ? (data as any).data : [];
+      const trendingTokens = pools.map((pool: any, index: number) => {
+        const attrs = pool.attributes || {};
+        const relationships = pool.relationships || {};
+        const baseTokenId = relationships.base_token?.data?.id || null;
+        const baseToken = baseTokenId ? tokenMap.get(baseTokenId) : null;
+
+        const priceChangePct = attrs.price_change_percentage || {};
+        
+        return {
+          id: baseTokenId,
+          name: baseToken?.name || null,
+          symbol: baseToken?.symbol || null,
+          image: baseToken?.image || null,
+          price_usd: parseFloat(attrs.base_token_price_usd) || null,
+          market_cap_usd: attrs.market_cap_usd ? parseFloat(attrs.market_cap_usd) : null,
+          volume_24h_usd: attrs.volume_usd?.h24 ? parseFloat(attrs.volume_usd.h24) : null,
+          price_change_percentage_24h: priceChangePct.h24 ? parseFloat(priceChangePct.h24) : null,
+          network,
+          address: baseToken?.address || null,
+          rank: index + 1,
+          liquidity_usd: attrs.reserve_in_usd ? parseFloat(attrs.reserve_in_usd) : null,
+          fdv_usd: attrs.fdv_usd ? parseFloat(attrs.fdv_usd) : null,
+          price_change_percentage_1h: priceChangePct.h1 ? parseFloat(priceChangePct.h1) : null,
+          price_change_percentage_7d: null, // Not available in GeckoTerminal API
+          price_change_percentage_30d: null, // Not available in GeckoTerminal API
+          holders_count: null, // Not available in GeckoTerminal API
+          created_at: null, // Token creation date not available
+          pool_created_at: attrs.pool_created_at || null,
+          trending_score: null, // Not provided by API
+        };
+      });
+
+      return trendingTokens;
+    } catch (err) {
+      clearTimeout(timeout);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[CoinGecko] getTrendingTokens failed for ${network}: ${msg}`);
+      throw err;
+    }
+  }
+
+  /**
+   * Get NFT collection statistics including floor price, volume, market cap, and owners
+   * Uses Pro API when COINGECKO_API_KEY is set; otherwise public API.
+   */
+  async getNFTCollectionStats(collectionIdentifier: string): Promise<any> {
+    const isPro = Boolean(this.proApiKey);
+    const baseUrl = isPro ? "https://pro-api.coingecko.com/api/v3" : "https://api.coingecko.com/api/v3";
+    
+    let collectionId = collectionIdentifier.trim().toLowerCase();
+
+    // If it's a contract address, try to look it up first
+    // For now, we'll assume the user provides the collection ID directly
+    // In the future, we could add a lookup by contract address
+
+    const url = `${baseUrl}/nfts/${encodeURIComponent(collectionId)}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      logger.debug(`[CoinGecko] GET ${url}`);
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          ...(isPro && this.proApiKey ? { "x-cg-pro-api-key": this.proApiKey } : {}),
+          "User-Agent": "ElizaOS-CoinGecko-Plugin/1.0",
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const body = await safeReadJson(res);
+        const msg = `CoinGecko NFT API error ${res.status}: ${res.statusText}${body ? ` - ${JSON.stringify(body)}` : ""}`;
+        logger.warn(`[CoinGecko] NFT collection stats request failed for ${collectionId}: ${msg}`);
+        throw new Error(msg);
+      }
+
+      const data = (await res.json()) as any;
+
+      // Format the response
+      const floorPrice = data.floor_price || {};
+      const marketCap = data.market_cap || {};
+      const volume24h = data.volume_24h || {};
+
+      return {
+        id: data.id || collectionId,
+        name: data.name || null,
+        symbol: data.symbol || null,
+        description: data.description || null,
+        image: data.image?.large || data.image?.small || data.image?.thumb || null,
+        contract_address: data.contract_address || null,
+        asset_platform_id: data.asset_platform_id || null,
+        
+        // Floor price data
+        floor_price_usd: floorPrice.usd || null,
+        floor_price_native: floorPrice.native_currency || null,
+        floor_price_24h_change_percentage: data.floor_price_24h_percentage_change?.usd || null,
+        
+        // Market cap
+        market_cap_usd: marketCap.usd || null,
+        market_cap_native: marketCap.native_currency || null,
+        
+        // Volume
+        volume_24h_usd: volume24h.usd || null,
+        volume_24h_native: volume24h.native_currency || null,
+        volume_24h_change_percentage: data.volume_24h_percentage_change?.usd || null,
+        
+        // Collection stats
+        total_supply: data.total_supply || null,
+        number_of_unique_addresses: data.number_of_unique_addresses || null,
+        number_of_unique_addresses_24h_percentage_change: data.number_of_unique_addresses_24h_percentage_change || null,
+        
+        // Links
+        homepage: data.links?.homepage || null,
+        twitter: data.links?.twitter || null,
+        discord: data.links?.discord || null,
+        
+        // Additional metadata
+        native_currency: data.native_currency || null,
+        native_currency_symbol: data.native_currency_symbol || null,
+        
+        // Raw data for reference
+        raw_data: data,
+      };
+    } catch (err) {
+      clearTimeout(timeout);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[CoinGecko] getNFTCollectionStats failed for ${collectionId}: ${msg}`);
+      throw err;
+    }
+  }
+
+  /**
+   * Get trending searches from CoinGecko including coins, NFTs, and categories
+   * Uses Pro API when COINGECKO_API_KEY is set; otherwise public API.
+   */
+  async getTrendingSearch(): Promise<any> {
+    const isPro = Boolean(this.proApiKey);
+    const baseUrl = isPro ? "https://pro-api.coingecko.com/api/v3" : "https://api.coingecko.com/api/v3";
+    
+    const url = `${baseUrl}/search/trending`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      logger.debug(`[CoinGecko] GET ${url}`);
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          ...(isPro && this.proApiKey ? { "x-cg-pro-api-key": this.proApiKey } : {}),
+          "User-Agent": "ElizaOS-CoinGecko-Plugin/1.0",
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const body = await safeReadJson(res);
+        const msg = `CoinGecko trending search API error ${res.status}: ${res.statusText}${body ? ` - ${JSON.stringify(body)}` : ""}`;
+        logger.warn(`[CoinGecko] trending search request failed: ${msg}`);
+        throw new Error(msg);
+      }
+
+      const data = (await res.json()) as any;
+
+      // Format trending coins
+      const trendingCoins = (Array.isArray(data.coins) ? data.coins : []).map((coinWrapper: any, index: number) => {
+        const coin = coinWrapper.item || {};
+        const coinData = coin.data || {};
+        const priceChangePercentage24h = coinData.price_change_percentage_24h || {};
+
+        return {
+          rank: index + 1,
+          name: coin.name || null,
+          symbol: coin.symbol || null,
+          market_cap_rank: coin.market_cap_rank || null,
+          price_usd: coinData.price || null,
+          price_change_24h: priceChangePercentage24h.usd || null,
+          market_cap: coinData.market_cap || null,
+          volume_24h: coinData.total_volume || null,
+          search_score: coin.score || 0,
+        };
+      });
+
+      // Format trending NFTs
+      const trendingNFTs = (Array.isArray(data.nfts) ? data.nfts : []).map((nft: any, index: number) => {
+        const nftData = nft.data || {};
+        
+        return {
+          rank: index + 1,
+          name: nft.name || null,
+          symbol: nft.symbol || null,
+          floor_price: nftData.floor_price || null,
+          floor_price_change_24h: nftData.floor_price_in_usd_24h_percentage_change || null,
+          volume_24h: nftData.h24_volume || null,
+          avg_sale_price: nftData.h24_average_sale_price || null,
+        };
+      });
+
+      // Format trending categories
+      const trendingCategories = (Array.isArray(data.categories) ? data.categories : []).map((category: any, index: number) => {
+        const categoryData = category.data || {};
+        
+        return {
+          rank: index + 1,
+          name: category.name || null,
+          coins_count: category.coins_count?.toString() || null,
+          market_cap_change_24h: categoryData.market_cap_change_percentage_24h?.usd || category.market_cap_change_24h || null,
+          total_market_cap: categoryData.market_cap ? categoryData.market_cap.toString() : category.total_market_cap?.toString() || null,
+          total_volume: categoryData.total_volume ? categoryData.total_volume.toString() : category.total_volume?.toString() || null,
+        };
+      });
+
+      return {
+        trending_coins: trendingCoins,
+        trending_nfts: trendingNFTs,
+        trending_categories: trendingCategories,
+      };
+    } catch (err) {
+      clearTimeout(timeout);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[CoinGecko] getTrendingSearch failed: ${msg}`);
+      throw err;
+    }
+  }
 }
 
 function isEvmAddress(s: string): boolean {
