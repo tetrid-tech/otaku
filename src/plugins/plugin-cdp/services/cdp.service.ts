@@ -617,4 +617,62 @@ export class CdpService extends Service {
       getViemClients: (accountName: string, network: CdpNetwork) => this.getViemClientsForAccount({ accountName, network }),
     });
   }
+
+  /**
+   * Transfer NFT from CDP wallet
+   * Uses viem to execute ERC721 safeTransferFrom
+   */
+  async transferNft(params: {
+    accountName: string;
+    network: CdpNetwork;
+    to: `0x${string}`;
+    contractAddress: `0x${string}`;
+    tokenId: string;
+  }): Promise<{ transactionHash: string; from: string }> {
+    if (!this.client) {
+      throw new Error("CDP is not authenticated");
+    }
+
+    const { accountName, network, to, contractAddress, tokenId } = params;
+
+    logger.info(`[CDP Service] Transferring NFT ${contractAddress}:${tokenId} to ${to} on ${network} for ${accountName}`);
+
+    const account = await this.getOrCreateAccount({ name: accountName });
+    const { walletClient, publicClient } = await this.getViemClientsForAccount({
+      accountName,
+      network,
+    });
+
+    // ERC721 safeTransferFrom ABI
+    const erc721Abi = [
+      {
+        name: 'safeTransferFrom',
+        type: 'function',
+        stateMutability: 'nonpayable',
+        inputs: [
+          { name: 'from', type: 'address' },
+          { name: 'to', type: 'address' },
+          { name: 'tokenId', type: 'uint256' }
+        ],
+        outputs: []
+      }
+    ] as const;
+
+    const txHash = await walletClient.writeContract({
+      address: contractAddress,
+      abi: erc721Abi,
+      functionName: 'safeTransferFrom',
+      args: [account.address as `0x${string}`, to, BigInt(tokenId)],
+    });
+
+    // Wait for transaction confirmation
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+    logger.info(`[CDP Service] NFT transfer successful: ${txHash}`);
+
+    return {
+      transactionHash: txHash,
+      from: account.address,
+    };
+  }
 }

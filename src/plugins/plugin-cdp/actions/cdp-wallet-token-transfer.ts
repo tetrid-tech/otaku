@@ -23,17 +23,17 @@ interface TransferParams {
   percentage?: number; // Percentage of balance (mutually exclusive with amount)
 }
 
-export const cdpWalletTransfer: ActionWithParams = {
-  name: "USER_WALLET_TRANSFER",
+export const cdpWalletTokenTransfer: ActionWithParams = {
+  name: "USER_WALLET_TOKEN_TRANSFER",
   similes: [
-    "SEND",
-    "TRANSFER",
+    "SEND_TOKEN",
+    "TRANSFER_TOKEN",
     "PAY",
     "SEND_TOKENS_CDP",
     "TRANSFER_TOKENS_CDP",
     "PAY_WITH_CDP",
   ],
-  description: "Use this action when you need to transfer tokens from user's wallet.",
+  description: "Use this action when you need to transfer tokens (ERC20 or native tokens like ETH) from user's wallet. For NFTs, use USER_WALLET_NFT_TRANSFER instead.",
   
   // Parameter schema for tool calling
   parameters: {
@@ -72,14 +72,14 @@ export const cdpWalletTransfer: ActionWithParams = {
       ) as CdpService;
 
       if (!cdpService) {
-        logger.warn("[USER_WALLET_TRANSFER] CDP service not available");
+        logger.warn("[USER_WALLET_TOKEN_TRANSFER] CDP service not available");
         return false;
       }
 
       return true;
     } catch (error) {
       logger.error(
-        "[USER_WALLET_TRANSFER] Error validating action:",
+        "[USER_WALLET_TOKEN_TRANSFER] Error validating action:",
         error instanceof Error ? error.message : String(error),
       );
       return false;
@@ -92,15 +92,15 @@ export const cdpWalletTransfer: ActionWithParams = {
     _options?: Record<string, unknown>,
     callback?: HandlerCallback,
   ): Promise<ActionResult> => {
-    logger.info("[USER_WALLET_TRANSFER] Handler invoked");
+    logger.info("[USER_WALLET_TOKEN_TRANSFER] Handler invoked");
     
     try {
-      logger.debug("[USER_WALLET_TRANSFER] Retrieving CDP service");
+      logger.debug("[USER_WALLET_TOKEN_TRANSFER] Retrieving CDP service");
       const cdpService = runtime.getService(CdpService.serviceType) as CdpService;
       
       if (!cdpService) {
         const errorMsg = "CDP Service not initialized";
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -115,15 +115,15 @@ export const cdpWalletTransfer: ActionWithParams = {
       }
 
       // Ensure the user has a wallet saved
-      logger.debug("[USER_WALLET_TRANSFER] Verifying entity wallet");
+      logger.debug("[USER_WALLET_TOKEN_TRANSFER] Verifying entity wallet");
       const walletResult = await getEntityWallet(
         runtime,
         message,
-        "USER_WALLET_TRANSFER",
+        "USER_WALLET_TOKEN_TRANSFER",
         callback,
       );
       if (walletResult.success === false) {
-        logger.warn("[USER_WALLET_TRANSFER] Entity wallet verification failed");
+        logger.warn("[USER_WALLET_TOKEN_TRANSFER] Entity wallet verification failed");
         return {
           ...walletResult.result,
           input: {},
@@ -133,7 +133,7 @@ export const cdpWalletTransfer: ActionWithParams = {
       const accountName = walletResult.metadata?.accountName as string;
       if (!accountName) {
         const errorMsg = "Could not find account name for wallet";
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -146,7 +146,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         });
         return errorResult;
       }
-      logger.debug("[USER_WALLET_TRANSFER] Entity wallet verified successfully");
+      logger.debug("[USER_WALLET_TOKEN_TRANSFER] Entity wallet verified successfully");
 
       // Read parameters from state (extracted by multiStepDecisionTemplate)
       const composedState = await runtime.composeState(message, ["ACTION_STATE"], true);
@@ -158,7 +158,7 @@ export const cdpWalletTransfer: ActionWithParams = {
 
       if (!toParam) {
         const errorMsg = "Missing required parameter 'to'. Please specify the recipient wallet address (0x...).";
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -175,7 +175,7 @@ export const cdpWalletTransfer: ActionWithParams = {
       // Validate recipient address format
       if (!toParam.startsWith("0x") || toParam.length !== 42) {
         const errorMsg = `Invalid recipient address: ${toParam}. Address must start with '0x' and be 42 characters long.`;
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -191,7 +191,7 @@ export const cdpWalletTransfer: ActionWithParams = {
 
       if (!tokenParam) {
         const errorMsg = "Missing required parameter 'token'. Please specify which token to transfer (e.g., 'USDC', 'ETH').";
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -211,7 +211,7 @@ export const cdpWalletTransfer: ActionWithParams = {
 
       if (!hasAmount && !hasPercentage) {
         const errorMsg = "Must specify either 'amount' or 'percentage'. Please specify how much to transfer (e.g., '10' or 50%).";
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -227,7 +227,7 @@ export const cdpWalletTransfer: ActionWithParams = {
 
       if (hasAmount && hasPercentage) {
         const errorMsg = "Cannot specify both 'amount' and 'percentage'. Please use only one.";
-        logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+        logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
         const errorResult: ActionResult = {
           text: `❌ ${errorMsg}`,
           success: false,
@@ -255,7 +255,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         // Validate percentage is between 0 and 100
         if (transferParams.percentage <= 0 || transferParams.percentage > 100) {
           const errorMsg = `Invalid percentage value: ${transferParams.percentage}. Must be between 0 and 100.`;
-          logger.error(`[USER_WALLET_TRANSFER] ${errorMsg}`);
+          logger.error(`[USER_WALLET_TOKEN_TRANSFER] ${errorMsg}`);
           const errorResult: ActionResult = {
             text: `❌ ${errorMsg}`,
             success: false,
@@ -279,9 +279,9 @@ export const cdpWalletTransfer: ActionWithParams = {
         network: transferParams.network,
       };
 
-      logger.info(`[USER_WALLET_TRANSFER] Transfer parameters: ${JSON.stringify(transferParams)}`);
+      logger.info(`[USER_WALLET_TOKEN_TRANSFER] Transfer parameters: ${JSON.stringify(transferParams)}`);
 
-      logger.info(`[USER_WALLET_TRANSFER] Looking up token in wallet: ${transferParams.token}`);
+      logger.info(`[USER_WALLET_TOKEN_TRANSFER] Looking up token in wallet: ${transferParams.token}`);
 
       // Get user's wallet info to find the token (use cached data if available)
       const walletInfo = await cdpService.getWalletInfoCached(accountName);
@@ -353,7 +353,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         }
         decimals = walletToken.decimals;
 
-        logger.info(`[USER_WALLET_TRANSFER] Found ${transferParams.token} in wallet: ${tokenAddress} on ${resolvedNetwork} with ${decimals} decimals (balance: ${walletToken.balanceFormatted})`);
+        logger.info(`[USER_WALLET_TOKEN_TRANSFER] Found ${transferParams.token} in wallet: ${tokenAddress} on ${resolvedNetwork} with ${decimals} decimals (balance: ${walletToken.balanceFormatted})`);
       }
       
       // Determine token type for CDP API
@@ -379,7 +379,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         const balanceRaw = parseUnits(walletToken.balanceFormatted, decimals);
         const percentageAmount = (balanceRaw * BigInt(Math.floor(transferParams.percentage * 100))) / BigInt(10000);
         
-        logger.info(`[USER_WALLET_TRANSFER] Calculated ${transferParams.percentage}% of ${walletToken.balanceFormatted} = ${percentageAmount.toString()} raw units`);
+        logger.info(`[USER_WALLET_TOKEN_TRANSFER] Calculated ${transferParams.percentage}% of ${walletToken.balanceFormatted} = ${percentageAmount.toString()} raw units`);
         
         if (percentageAmount === 0n) {
           throw new Error(`Insufficient balance: ${transferParams.percentage}% of your ${transferParams.token.toUpperCase()} is 0`);
@@ -399,7 +399,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         ? `${transferParams.percentage}% (${amountToTransfer} ${transferParams.token.toUpperCase()})`
         : `${amountToTransfer} ${transferParams.token.toUpperCase()}`;
 
-      logger.info(`[USER_WALLET_TRANSFER] Executing transfer: ${displayAmount} (${token}) to ${transferParams.to} on ${resolvedNetwork}`);
+      logger.info(`[USER_WALLET_TOKEN_TRANSFER] Executing transfer: ${displayAmount} (${token}) to ${transferParams.to} on ${resolvedNetwork}`);
 
       callback?.({ text: `🔄 Sending ${displayAmount} to ${transferParams.to}...` });
 
@@ -440,7 +440,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         input: inputParams,
       } as ActionResult & { input: typeof inputParams };
     } catch (error) {
-      logger.error("[USER_WALLET_TRANSFER] Action failed:", error instanceof Error ? error.message : String(error));
+      logger.error("[USER_WALLET_TOKEN_TRANSFER] Action failed:", error instanceof Error ? error.message : String(error));
       
       let errorMessage = "Transfer failed";
       let errorCode = "action_failed";
@@ -496,7 +496,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         name: "{{agent}}",
         content: {
           text: "🔄 Sending 10 USDC to 0x1234567890123456789012345678901234567890...",
-          action: "USER_WALLET_TRANSFER",
+          action: "USER_WALLET_TOKEN_TRANSFER",
         },
       },
     ],
@@ -509,7 +509,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         name: "{{agent}}",
         content: {
           text: "🔄 Sending 2 WLFI to 0xabcd1234abcd1234abcd1234abcd1234abcd1234...",
-          action: "USER_WALLET_TRANSFER",
+          action: "USER_WALLET_TOKEN_TRANSFER",
         },
       },
     ],
@@ -522,7 +522,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         name: "{{agent}}",
         content: {
           text: "🔄 Sending 0.5 ETH to the specified address...",
-          action: "USER_WALLET_TRANSFER",
+          action: "USER_WALLET_TOKEN_TRANSFER",
         },
       },
     ],
@@ -535,7 +535,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         name: "{{agent}}",
         content: {
           text: "🔄 Sending 50% of your USDC...",
-          action: "USER_WALLET_TRANSFER",
+          action: "USER_WALLET_TOKEN_TRANSFER",
         },
       },
     ],
@@ -548,7 +548,7 @@ export const cdpWalletTransfer: ActionWithParams = {
         name: "{{agent}}",
         content: {
           text: "🔄 Sending 100% of your ETH...",
-          action: "USER_WALLET_TRANSFER",
+          action: "USER_WALLET_TOKEN_TRANSFER",
         },
       },
     ],
@@ -561,12 +561,13 @@ export const cdpWalletTransfer: ActionWithParams = {
         name: "{{agent}}",
         content: {
           text: "🔄 Sending 80% of your WLFI...",
-          action: "USER_WALLET_TRANSFER",
+          action: "USER_WALLET_TOKEN_TRANSFER",
         },
       },
     ],
   ],
 };
 
-export default cdpWalletTransfer;
+export default cdpWalletTokenTransfer;
+
 

@@ -8,7 +8,8 @@ import { CdpService } from "./services/cdp.service";
 // import { cdpCreateWallet } from "./actions/cdp-wallet-create";
 import { cdpWalletInfo } from "./actions/cdp-wallet-info";
 import { cdpWalletSwap } from "./actions/cdp-wallet-swap";
-import { cdpWalletTransfer } from "./actions/cdp-wallet-transfer";
+import { cdpWalletTokenTransfer } from "./actions/cdp-wallet-token-transfer";
+import { cdpWalletNftTransfer } from "./actions/cdp-wallet-nft-transfer";
 // import { cdpWalletUnwrap } from "./actions/cdp-wallet-unwrap";
 
 // Providers
@@ -20,10 +21,10 @@ export type { CdpNetwork } from "./types";
 export const cdpPlugin: Plugin = {
   name: "cdp",
   description:
-    "Coinbase Developer Platform plugin providing authenticated EVM account creation, token transfers, and swaps via CDP SDK",
+    "Coinbase Developer Platform plugin providing authenticated EVM account creation, token transfers, NFT transfers, and swaps via CDP SDK",
   evaluators: [],
   providers: [walletStateProvider],
-  actions: [cdpWalletInfo, cdpWalletTransfer, cdpWalletSwap],
+  actions: [cdpWalletInfo, cdpWalletTokenTransfer, cdpWalletNftTransfer, cdpWalletSwap],
   services: [CdpService],
 };
 
