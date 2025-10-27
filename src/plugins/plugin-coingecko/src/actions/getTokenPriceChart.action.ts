@@ -19,7 +19,7 @@ export const getTokenPriceChartAction: ActionWithParams = {
     "TOKEN_PERFORMANCE",
   ],
   description:
-    `Use this action when the user asks to see a price chart, graph, or price history for a token. When called successfully, this action automatically provides the token chart visualization in the chat with historical price data points, current price, and price change statistics. Supports multiple timeframes (1h, 24h, 7d, 30d, 1y). Native tokens (${Object.keys(nativeTokenIds).join(', ').toUpperCase()}) can be queried by symbol. For all other tokens, you MUST provide the contract address.`,
+    `Use this action when the user asks to see a price chart, graph, or price history for a token. When called successfully, this action automatically provides the token chart visualization in the chat with historical price data points, current price, and price change statistics.`,
 
   parameters: {
     token: {
