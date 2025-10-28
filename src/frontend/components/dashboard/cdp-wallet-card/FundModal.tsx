@@ -28,13 +28,13 @@ export function FundModalContent({ walletAddress, shortAddress }: FundModalConte
 
   return (
     <div className="space-y-4 w-full max-w-md mx-auto">
-        <h3 className="text-lg font-semibold">Fund Your Wallet</h3>
-        <p className="text-sm text-muted-foreground">
-          Transfer assets to your wallet on any supported network
-        </p>
-        
-        {/* Network Address List - Each chain in its own card */}
-        <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+      <h3 className="text-lg font-semibold">Fund Your Wallet</h3>
+      <p className="text-sm text-muted-foreground">
+        Transfer assets to your wallet on any supported network
+      </p>
+      
+      {/* Network Address List - Each chain in its own card */}
+      <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
         {SUPPORTED_CHAINS.map((chain) => {
           const config = CHAIN_UI_CONFIGS[chain];
           const chainWalletIcon = getChainWalletIcon(chain);
