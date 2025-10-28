@@ -5,7 +5,7 @@ import { useCDPWallet } from './hooks/useCDPWallet';
 import { elizaClient } from './lib/elizaClient';
 import { socketManager } from './lib/socketManager';
 import { ChatInterface } from './components/chat/chat-interface';
-import { SidebarProvider } from './components/ui/sidebar';
+import { SidebarProvider, useSidebar } from './components/ui/sidebar';
 import { DashboardSidebar } from './components/dashboard/sidebar';
 import Widget from './components/dashboard/widget';
 import { CDPWalletCard, type CDPWalletCardRef } from './components/dashboard/cdp-wallet-card';
@@ -558,6 +558,79 @@ function App() {
 
   return (
     <SidebarProvider>
+      <AppContent
+        agent={agent}
+        userId={userId}
+        connected={connected}
+        channels={channels}
+        activeChannelId={activeChannelId}
+        isCreatingChannel={isCreatingChannel}
+        isNewChatMode={isNewChatMode}
+        currentView={currentView}
+        userProfile={userProfile}
+        totalBalance={totalBalance}
+        mockData={mockData}
+        isLoadingChannels={isLoadingChannels}
+        walletRef={walletRef}
+        handleNewChat={handleNewChat}
+        handleChannelSelect={handleChannelSelect}
+        handleBalanceChange={handleBalanceChange}
+        setCurrentView={setCurrentView}
+        setChannels={setChannels}
+        setActiveChannelId={setActiveChannelId}
+        setIsNewChatMode={setIsNewChatMode}
+        updateUserProfile={updateUserProfile}
+        signOut={signOut}
+        isSignedIn={isSignedIn}
+      />
+    </SidebarProvider>
+  );
+}
+
+// Inner component that has access to useSidebar
+function AppContent({
+  agent,
+  userId,
+  connected,
+  channels,
+  activeChannelId,
+  isCreatingChannel,
+  isNewChatMode,
+  currentView,
+  userProfile,
+  totalBalance,
+  mockData,
+  isLoadingChannels,
+  walletRef,
+  handleNewChat,
+  handleChannelSelect,
+  handleBalanceChange,
+  setCurrentView,
+  setChannels,
+  setActiveChannelId,
+  setIsNewChatMode,
+  updateUserProfile,
+  signOut,
+  isSignedIn,
+}: any) {
+  const { setOpenMobile } = useSidebar();
+
+  const handleNewChatWithSidebarClose = () => {
+    handleNewChat();
+    setCurrentView('chat');
+    // Close mobile sidebar
+    setOpenMobile(false);
+  };
+
+  const handleChannelSelectWithSidebarClose = (id: string) => {
+    handleChannelSelect(id);
+    setCurrentView('chat');
+    // Close mobile sidebar
+    setOpenMobile(false);
+  };
+
+  return (
+    <>
       {/* Sign In Modal - Shows when CDP is configured and user is not signed in */}
       {import.meta.env.VITE_CDP_PROJECT_ID && (
         <SignInModal isOpen={!isSignedIn} />
@@ -573,14 +646,8 @@ function App() {
           <DashboardSidebar
             channels={channels}
             activeChannelId={activeChannelId}
-            onChannelSelect={(id) => {
-              handleChannelSelect(id);
-              setCurrentView('chat');
-            }}
-            onNewChat={() => {
-              handleNewChat();
-              setCurrentView('chat');
-            }}
+            onChannelSelect={handleChannelSelectWithSidebarClose}
+            onNewChat={handleNewChatWithSidebarClose}
             isCreatingChannel={isCreatingChannel}
             userProfile={userProfile}
             onSignOut={signOut}
@@ -634,7 +701,7 @@ function App() {
                     onChannelCreated={(channelId, channelName) => {
                       // Add new channel to the list and set it as active
                       const now = Date.now();
-                      setChannels((prev) => [
+                      setChannels((prev: Channel[]) => [
                         {
                           id: channelId,
                           name: channelName,
@@ -666,7 +733,7 @@ function App() {
           </div>
         </div>
       </div>
-    </SidebarProvider>
+    </>
   );
 }
 

@@ -17,14 +17,17 @@ import { Textarea } from "../ui/textarea"
 
 // Quick start prompts for new conversations (static fallback)
 const DEFAULT_QUICK_PROMPTS = [
-  "Show my wallet",
-  "What's happening in DeFi today?",
-  "Compare EIGEN vs MORPHO",
-  "Latest Ethereum news",
-  "Get Bitcoin price",
-  "What can you help me with?",
-  "Analyze Aave protocol TVL"
+  "Show my wallet portfolio",
+  "What's trending on Base?",
+  "Compare Aave vs Uniswap TVL",
+  "Show me trending NFT collections",
+  "Get ETH price chart and insights",
+  "Compare Eigen vs Morpho",
+  "Latest DeFi news"
 ]
+
+// Number of prompts to show on mobile before "+X more" button
+const MOBILE_VISIBLE_PROMPTS = 2
 
 // Helper function to extract chart data from a message
 const extractChartData = (message: Message): any => {
@@ -97,6 +100,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDummyToolGroup, setShowDummyToolGroup] = useState(false)
+  const [showPromptsModal, setShowPromptsModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const isUserScrollingRef = useRef(false) // Track if user is actively scrolling
@@ -434,6 +438,9 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
   const handleQuickPrompt = async (message: string) => {
     if (isTyping || !message.trim() || isCreatingChannel) return
     
+    // Close modal if open
+    setShowPromptsModal(false)
+    
     // Clear any previous errors
     setError(null)
     
@@ -737,16 +744,75 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                 <p className="text-[10px] md:text-xs uppercase tracking-wider text-muted-foreground mb-2 md:mb-3 font-mono">
                   {error ? 'Try Again' : 'Quick Start'}
                 </p>
-                <div className="flex flex-wrap gap-1.5 md:gap-2">
+                
+                {/* Mobile: Single line with scroll + More button */}
+                <div className="md:hidden">
+                  <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+                    {DEFAULT_QUICK_PROMPTS.slice(0, MOBILE_VISIBLE_PROMPTS).map((prompt, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleQuickPrompt(prompt)}
+                        className="px-2 py-1 text-[11px] bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors whitespace-nowrap flex-shrink-0"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                    {DEFAULT_QUICK_PROMPTS.length > MOBILE_VISIBLE_PROMPTS && (
+                      <button
+                        onClick={() => setShowPromptsModal(true)}
+                        className="px-2 py-1 text-[11px] bg-accent hover:bg-accent/80 text-foreground/40 rounded border border-border transition-colors whitespace-nowrap flex-shrink-0"
+                      >
+                        +{DEFAULT_QUICK_PROMPTS.length - MOBILE_VISIBLE_PROMPTS} more
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Desktop: Show all in wrapped layout */}
+                <div className="hidden md:flex flex-wrap gap-2">
                   {DEFAULT_QUICK_PROMPTS.map((prompt, index) => (
                     <button
                       key={index}
                       onClick={() => handleQuickPrompt(prompt)}
-                      className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left whitespace-normal"
+                      className="px-3 py-2 text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left"
                     >
                       {prompt}
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Mobile Prompts Modal */}
+            {showPromptsModal && (
+              <div 
+                className="fixed inset-0 bg-black/50 z-50 flex items-end md:hidden"
+                onClick={() => setShowPromptsModal(false)}
+              >
+                <div 
+                  className="bg-background rounded-t-2xl w-full max-h-[60vh] overflow-y-auto p-4 animate-in slide-in-from-bottom"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold">Quick Start Options</h3>
+                    <button
+                      onClick={() => setShowPromptsModal(false)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {DEFAULT_QUICK_PROMPTS.map((prompt, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleQuickPrompt(prompt)}
+                        className="px-3 py-2.5 text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
