@@ -1121,8 +1121,6 @@ async function runMultiStepCore({ runtime, message, state, callback }: { runtime
       template: runtime.character.templates?.multiStepDecisionTemplate || multiStepDecisionTemplate,
     });
 
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", prompt);
-
     const stepResultRaw = await runtime.useModel(ModelType.TEXT_LARGE, { prompt });
     const parsedStep = parseKeyValueXml(stepResultRaw);
 
@@ -1137,8 +1135,6 @@ async function runMultiStepCore({ runtime, message, state, callback }: { runtime
     }
 
     const { thought, action, isFinish, parameters } = parsedStep as any;
-
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", parsedStep);
 
     // If no action to execute, check if we should finish
     if (!action) {
@@ -1267,8 +1263,6 @@ async function runMultiStepCore({ runtime, message, state, callback }: { runtime
     state: accumulatedState,
     template: runtime.character.templates?.multiStepSummaryTemplate || multiStepSummaryTemplate,
   });
-
-  console.log("####################################################", summaryPrompt);
 
   const finalOutput = await runtime.useModel(ModelType.TEXT_LARGE, { prompt: summaryPrompt });
   const summary = parseKeyValueXml(finalOutput);
