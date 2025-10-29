@@ -125,15 +125,15 @@ export const CDPWalletCard = forwardRef<CDPWalletCardRef, CDPWalletCardProps>(
   // Expose refresh methods via ref
   useImperativeHandle(ref, () => ({
     refreshTokens: async () => {
-      console.log('🔄 Refreshing tokens via ref...');
+      console.log(' Refreshing tokens via ref...');
       await syncTokens();
     },
     refreshNFTs: async () => {
-      console.log('🔄 Refreshing NFTs via ref...');
+      console.log(' Refreshing NFTs via ref...');
       await syncNfts();
     },
     refreshAll: async () => {
-      console.log('🔄 Refreshing all wallet data via ref...');
+      console.log(' Refreshing all wallet data via ref...');
       await Promise.all([syncTokens(), syncNfts()]);
     },
   }));
@@ -834,12 +834,12 @@ export const CDPWalletCard = forwardRef<CDPWalletCardRef, CDPWalletCardProps>(
                             // Fallback to emoji if image fails to load
                             const parent = e.currentTarget.parentElement;
                             if (parent) {
-                              parent.innerHTML = `<span class="text-2xl">🖼️</span>`;
+                              parent.innerHTML = `<span class="text-2xl"></span>`;
                             }
                           }}
                         />
                       ) : (
-                        <span className="text-2xl">🖼️</span>
+                        <span className="text-2xl"></span>
                       )}
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
@@ -912,7 +912,7 @@ export const CDPWalletCard = forwardRef<CDPWalletCardRef, CDPWalletCardProps>(
                                     isReceived ? 'bg-green-500/10' : 'bg-red-500/10'
                                   }`}>
                                     <span className="text-base sm:text-lg">
-                                      {isReceived ? '↓' : '↑'}
+                                      {isReceived ? '' : ''}
                                     </span>
                                   </div>
                                   <div className="flex flex-col min-w-0 flex-1">

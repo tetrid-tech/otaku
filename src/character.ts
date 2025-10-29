@@ -49,7 +49,7 @@ export const character: Character = {
       {
         name: "Otaku",
         content: {
-          text: "Planned steps: (1) Bridge 2 ETH → Arbitrum (Relay). (2) Swap ~1 ETH → USDC on Arbitrum. Estimated fees <$5. Confirm to proceed?",
+          text: "Planned steps: (1) Bridge 2 ETH  Arbitrum (Relay). (2) Swap ~1 ETH  USDC on Arbitrum. Estimated fees <$5. Confirm to proceed?",
         },
       },
     ],
@@ -75,7 +75,7 @@ export const character: Character = {
       {
         name: "Otaku",
         content: {
-          text: "Swapping ~0.015 ETH → 40 USDC on Base. Current rate ~$2,667/ETH. Gas estimate: $0.02. Executing now.",
+          text: "Swapping ~0.015 ETH  40 USDC on Base. Current rate ~$2,667/ETH. Gas estimate: $0.02. Executing now.",
         },
       },
     ],
@@ -101,7 +101,7 @@ export const character: Character = {
       {
         name: "Otaku",
         content: {
-          text: "Bridging another 0.00015 ETH → Polygon via Relay. Estimated time: ~2 min. Gas: ~$1.50. Executing now.",
+          text: "Bridging another 0.00015 ETH  Polygon via Relay. Estimated time: ~2 min. Gas: ~$1.50. Executing now.",
         },
       },
     ],

@@ -6,42 +6,42 @@ This directory contains comprehensive tests for the `@elizaos/server` package.
 
 ### 1. **Basic Functionality Tests** (`basic-functionality.test.ts`)
 
-- ✅ **Working** - Core logic tests without external dependencies
+-  **Working** - Core logic tests without external dependencies
 - Tests path utilities, UUID validation, security patterns
 - Tests rate limiting concepts and middleware patterns
 - Tests server configuration logic
 
 ### 2. **Validation Tests** (`validation.test.ts`)
 
-- ⚠️ **Needs dependency resolution** - Tests validation functions with mocking
+-  **Needs dependency resolution** - Tests validation functions with mocking
 - Tests `validateChannelId`, `validateAgentId`, etc.
 - Tests security logging and pattern detection
 - Tests error handling for various input types
 
 ### 3. **Middleware Tests** (`middleware.test.ts`)
 
-- ⚠️ **Needs dependency resolution** - Tests middleware functions
+-  **Needs dependency resolution** - Tests middleware functions
 - Tests `agentExistsMiddleware`, `validateUuidMiddleware`
 - Tests security middleware and rate limiting
 - Tests content type validation
 
 ### 4. **AgentServer Integration Tests** (`agent-server.test.ts`)
 
-- ⚠️ **Needs dependency resolution** - Full AgentServer class tests
+-  **Needs dependency resolution** - Full AgentServer class tests
 - Tests server initialization and lifecycle
 - Tests agent registration and management
 - Tests database operations and error handling
 
 ### 5. **API Endpoint Tests** (`api.test.ts`)
 
-- ⚠️ **Needs supertest dependency** - HTTP endpoint integration tests
+-  **Needs supertest dependency** - HTTP endpoint integration tests
 - Tests health check, agent, and channel endpoints
 - Tests security headers and CORS
 - Tests authentication and error handling
 
 ### 6. **Utility Tests** (`utils.test.ts`)
 
-- ⚠️ **Needs mocking fixes** - Tests utility functions
+-  **Needs mocking fixes** - Tests utility functions
 - Tests `expandTildePath` and `resolvePgliteDir`
 - Tests path security and environment handling
 
@@ -73,21 +73,21 @@ bun test --watch test/basic-functionality.test.ts
 
 ## Test Categories
 
-### ✅ **Unit Tests**
+###  **Unit Tests**
 
 - Individual function testing
 - Logic validation without dependencies
 - Security pattern detection
 - Configuration handling
 
-### ⚠️ **Integration Tests**
+###  **Integration Tests**
 
 - Full server functionality
 - Database integration
 - HTTP endpoint testing
 - Middleware chain testing
 
-### 🔧 **Mocking Strategy**
+###  **Mocking Strategy**
 
 - Mock external dependencies (`@elizaos/core`, `@elizaos/plugin-sql`)
 - Mock file system operations

@@ -62,12 +62,12 @@ const run = createBuildRunner({
         console.log('\nCopying client assets...');
         copyTasks.push(
           copyAssets([{ from: resolvedClientDist, to: './dist/client' }]).then(() =>
-            console.log('✓ Client assets copied')
+            console.log(' Client assets copied')
           )
         );
       } else {
         console.warn(
-          '⚠️  Client assets not found. The web UI will not be bundled into @elizaos/server.'
+          '  Client assets not found. The web UI will not be bundled into @elizaos/server.'
         );
       }
 
@@ -76,7 +76,7 @@ const run = createBuildRunner({
         console.log('Copying static assets...');
         copyTasks.push(
           copyAssets([{ from: './public', to: './dist/public' }]).then(() =>
-            console.log('✓ Static assets copied')
+            console.log(' Static assets copied')
           )
         );
       }
@@ -86,7 +86,7 @@ const run = createBuildRunner({
         const copyStart = performance.now();
         await Promise.all(copyTasks);
         const copyDuration = ((performance.now() - copyStart) / 1000).toFixed(2);
-        console.log(`✅ All assets copied in parallel (${copyDuration}s)`);
+        console.log(` All assets copied in parallel (${copyDuration}s)`);
       }
     }
   },

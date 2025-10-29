@@ -160,7 +160,7 @@ const Arrow = ({ direction, index }: ArrowProps) => {
         "will-change-transform"
       )}
     >
-      {direction === "up" ? "↑" : "↓"}
+      {direction === "up" ? "" : ""}
     </span>
   );
 };

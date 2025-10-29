@@ -123,7 +123,7 @@ export default function AgentChat({ agent }: AgentChatProps) {
 function getAgentResponse(agentName: string, userMessage: string): string {
   const responses: Record<string, string[]> = {
     KRIMSON: [
-      "LET ME HELP YOU WITH THAT! 💪",
+      "LET ME HELP YOU WITH THAT! ",
       "THAT'S A GREAT QUESTION! HERE'S WHAT I THINK...",
       "I'VE GOT SOME IDEAS ABOUT THIS. LET'S BREAK IT DOWN.",
       "INTERESTING! I'VE BEEN WORKING ON SOMETHING SIMILAR.",

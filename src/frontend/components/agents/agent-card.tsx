@@ -37,7 +37,7 @@ export default function AgentCard({ agent, onSelect, isSelected }: AgentCardProp
         </div>
         {agent.featured && (
           <div className="absolute -top-2 -left-2 bg-primary text-primary-foreground text-xs size-5 rounded flex items-center justify-center font-semibold border-2 border-background">
-            ★
+            
           </div>
         )}
       </div>

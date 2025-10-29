@@ -2,21 +2,21 @@
 
 A custom React application powered by ElizaOS, featuring a beautiful UI for chatting with AI agents.
 
-## 🚀 Features
+##  Features
 
-- ✅ **Single Port** - Server and UI run on the same port (default: 3000)
-- ✅ **One Command** - Start everything with `bun run dev`
-- ✅ **Real-time Chat** - WebSocket-powered instant messaging
-- ✅ **Beautiful UI** - Modern, responsive design with Tailwind CSS
-- ✅ **Hot Reload** - Fast development with Vite HMR
-- ✅ **Agent Management** - View and chat with multiple AI agents
+-  **Single Port** - Server and UI run on the same port (default: 3000)
+-  **One Command** - Start everything with `bun run dev`
+-  **Real-time Chat** - WebSocket-powered instant messaging
+-  **Beautiful UI** - Modern, responsive design with Tailwind CSS
+-  **Hot Reload** - Fast development with Vite HMR
+-  **Agent Management** - View and chat with multiple AI agents
 
-## 📋 Prerequisites
+##  Prerequisites
 
 - [Bun](https://bun.sh/) installed on your system
 - Node.js 18+ (for compatibility)
 
-## 🛠️ Setup
+##  Setup
 
 ### 1. Install Dependencies
 
@@ -43,7 +43,7 @@ NODE_ENV=development
 
 You can modify these if needed.
 
-## 🚀 Running the App
+##  Running the App
 
 ### Development Mode
 
@@ -69,7 +69,7 @@ bun run build
 bun run start
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 my-eliza-app/
@@ -98,7 +98,7 @@ my-eliza-app/
 └── .env                     # Environment variables
 ```
 
-## 🔧 Customization
+##  Customization
 
 ### Modifying the Agent
 
@@ -125,7 +125,7 @@ export const character: Character = {
 2. **Real-time Updates**: Use `socketManager` for WebSocket events
 3. **New Routes**: Add routes in `App.tsx`
 
-## 🎨 UI Components
+##  UI Components
 
 ### AgentList
 Displays available agents in a grid layout. Click an agent to start chatting.
@@ -137,7 +137,7 @@ Real-time chat interface with:
 - Smooth scrolling
 - Send on Enter key
 
-## 🔌 API Usage
+##  API Usage
 
 ### REST API
 
@@ -174,7 +174,7 @@ socketManager.onMessage((data) => {
 });
 ```
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Port Already in Use
 
@@ -204,7 +204,7 @@ The Vite dev server should start automatically. Check the console for:
 Vite dev server running on http://localhost:5173
 ```
 
-## 📝 Scripts
+##  Scripts
 
 - `bun run dev` - Start development server (frontend + backend)
 - `bun run build` - Build for production
@@ -212,30 +212,81 @@ Vite dev server running on http://localhost:5173
 - `bun run start` - Start production server
 - `bun run type-check` - Check TypeScript types
 
-## 🌐 Accessing the App
+##  Accessing the App
 
 Once running:
 - **UI**: http://localhost:3000
 - **API**: http://localhost:3000/api/
 - **Health Check**: http://localhost:3000/api/server/ping
 
-## 📖 Next Steps
+##  Plugins
+
+### CDP Plugin
+
+The CDP (Coinbase Developer Platform) plugin provides wallet and payment functionality:
+
+#### Available Actions
+
+- **USER_WALLET_INFO** - View wallet balances, tokens, and NFTs
+- **USER_WALLET_TOKEN_TRANSFER** - Transfer tokens to other addresses
+- **USER_WALLET_NFT_TRANSFER** - Transfer NFTs to other addresses
+- **USER_WALLET_SWAP** - Swap tokens using DEX aggregators
+- **FETCH_WITH_PAYMENT**  - Make paid API requests using x402 protocol
+
+#### FETCH_WITH_PAYMENT Action
+
+Make HTTP requests to x402-enabled paid APIs with automatic onchain payment handling.
+
+**Features:**
+- Automatic 402 Payment Required response handling
+- Onchain USDC payments on Base network
+- Configurable payment limits
+- Support for GET and POST requests
+- Returns both API response and payment receipt
+
+**Usage Examples:**
+```
+"fetch https://api.example.com/paid-data with payment"
+"make a paid request to https://x402-service.com/premium with max payment 2 USDC"
+"POST to https://api.example.com/submit with body {\"key\": \"value\"}"
+```
+
+**Parameters:**
+- `url` (required) - The x402-enabled API endpoint
+- `method` (optional) - HTTP method (GET or POST, defaults to GET)
+- `headers` (optional) - Custom HTTP headers
+- `body` (optional) - Request body for POST requests
+- `maxPayment` (optional) - Maximum payment in USDC (defaults to 1.0)
+
+**Response includes:**
+- API response data
+- Payment transaction hash
+- Network and payer information
+- Success status
+
+Learn more: https://docs.cdp.coinbase.com/x402/quickstart-for-buyers
+
+### Web Search Plugin
+
+Provides web search and crypto news functionality using Tavily and CoinDesk APIs.
+
+##  Next Steps
 
 1. **Customize your agent** in `src/character.ts`
 2. **Style the UI** in `src/frontend/`
 3. **Add plugins** to extend functionality
 4. **Deploy** your app to production
 
-## 🤝 Contributing
+##  Contributing
 
 This is your custom Eliza app! Feel free to modify it however you like.
 
-## 📄 License
+##  License
 
 MIT
 
 ---
 
-Built with ❤️ using [ElizaOS](https://github.com/elizaos/eliza)
+Built with  using [ElizaOS](https://github.com/elizaos/eliza)
 
 # otaku-fe

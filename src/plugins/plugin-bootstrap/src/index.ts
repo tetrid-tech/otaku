@@ -68,9 +68,9 @@ Determine the next step the assistant should take in this conversation to help t
 **Actions Completed in THIS Execution Round**: {{traceActionResult.length}}
 
 {{#if traceActionResult.length}}
-⚠️ You have ALREADY taken {{traceActionResult.length}} action(s) in this execution round. Review them carefully before deciding next steps.
+ You have ALREADY taken {{traceActionResult.length}} action(s) in this execution round. Review them carefully before deciding next steps.
 {{else}}
-✓ This is your FIRST decision step - no actions have been taken yet in this round.
+ This is your FIRST decision step - no actions have been taken yet in this round.
 {{/if}}
 
 ---
@@ -86,8 +86,8 @@ Determine the next step the assistant should take in this conversation to help t
 - **IF this is step 1 (no prior actions)**: Proceed with the user's request if it requires action.
 - **IF you've already taken actions in THIS round**: 
   * Did you ALREADY complete what the user asked for?
-  * If YES → Set \`isFinish: true\` immediately. Do NOT repeat the action.
-  * If NO → Only proceed if the user's request requires MULTIPLE different actions.
+  * If YES  Set \`isFinish: true\` immediately. Do NOT repeat the action.
+  * If NO  Only proceed if the user's request requires MULTIPLE different actions.
 
 ## 3. Identify Missing Information
 - Does the user's request require information you don't have?
@@ -95,8 +95,8 @@ Determine the next step the assistant should take in this conversation to help t
 
 ## 4. Choose Next Action
 - Based on what you've ALREADY done in THIS round, what (if anything) is still needed?
-- If the user asked for ONE action and you've completed it successfully → Set \`isFinish: true\`
-- If the user asked for MULTIPLE things and some remain → Continue with the next action
+- If the user asked for ONE action and you've completed it successfully  Set \`isFinish: true\`
+- If the user asked for MULTIPLE things and some remain  Continue with the next action
 - Extract parameters from the **latest user message first**, then results from THIS round.
 
 ---
@@ -112,7 +112,7 @@ You have executed the following actions in THIS multi-step execution round:
 
 {{actionResults}}
 
-⚠️ **CRITICAL**: These are actions YOU took in this execution, not from earlier in the conversation.
+ **CRITICAL**: These are actions YOU took in this execution, not from earlier in the conversation.
 - If the user's request has been satisfied by these actions, set \`isFinish: true\`
 - Do NOT repeat an action unless it failed or the user explicitly asked for multiple executions
 
@@ -126,8 +126,8 @@ No actions have been executed yet in this round. This is your first decision ste
 
 1. **Step Awareness**: You are on step {{iterationCount}} of {{maxIterations}}. If step > 1, check what you've already done.
 2. **Single vs Multiple Actions**: 
-   - User says "send 0.05 ETH" → ONE action needed, once executed successfully, set isFinish: true
-   - User says "get price of BTC and ETH then swap" → MULTIPLE actions needed, only set isFinish: true when ALL are done
+   - User says "send 0.05 ETH"  ONE action needed, once executed successfully, set isFinish: true
+   - User says "get price of BTC and ETH then swap"  MULTIPLE actions needed, only set isFinish: true when ALL are done
 3. **Check Before Acting**: Before executing ANY action, check if you've already done it in THIS round
 4. **When to Finish**: Set isFinish: true when the ENTIRE user request is satisfied by actions in THIS round, not just one action
 5. **Ground in Evidence**: Parameters must come from the latest message, not from prior round results
@@ -149,14 +149,14 @@ CRITICAL: Only set isFinish: true when the COMPLETE user request is fulfilled.
 "isFinish" Set to true ONLY when the user's ENTIRE request is satisfied by actions taken in THIS round
 </keys>
 
-⚠️ CRITICAL STOP-CONDITION CHECKS:
+ CRITICAL STOP-CONDITION CHECKS:
 - What step am I on? ({{iterationCount}}/{{maxIterations}})
 - How many actions have I taken THIS round? ({{traceActionResult.length}})
-- If > 0 actions: Have I completed ALL parts of the user's request? → If YES, set isFinish: true to exit loop
-- Am I about to repeat an action I JUST did in THIS round? → If YES, STOP and set isFinish: true instead
+- If > 0 actions: Have I completed ALL parts of the user's request?  If YES, set isFinish: true to exit loop
+- Am I about to repeat an action I JUST did in THIS round?  If YES, STOP and set isFinish: true instead
 - Does the user's request require ONE action or MULTIPLE? 
-  * ONE action (e.g., "send ETH"): Execute → Next step set isFinish: true
-  * MULTIPLE actions (e.g., "get price then swap"): Execute all → Then set isFinish: true
+  * ONE action (e.g., "send ETH"): Execute  Next step set isFinish: true
+  * MULTIPLE actions (e.g., "get price then swap"): Execute all  Then set isFinish: true
 
 Your final output MUST be in this XML format:
 
@@ -1196,7 +1196,7 @@ async function runMultiStepCore({ runtime, message, state, callback }: { runtime
 
       if (action) {
         const actionContent = {
-          text: `🔎 Executing action: ${action}`,
+          text: ` Executing action: ${action}`,
           actions: [action],
           thought: thought ?? '',
         };

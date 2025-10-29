@@ -40,7 +40,7 @@ async function copyClientDist() {
     console.log(`Copying from ${clientDistPath} to ${targetPath}...`);
     cpSync(clientDistPath, targetPath, { recursive: true });
 
-    console.log('✓ Client dist files copied successfully to:', targetPath);
+    console.log(' Client dist files copied successfully to:', targetPath);
   } catch (error) {
     console.error('Error copying client dist files:', error);
     process.exit(1);

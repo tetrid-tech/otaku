@@ -201,7 +201,7 @@ export async function copyAssets(assets: Array<{ from: string; to: string }>) {
     if (result.success) {
       successCount++;
     } else {
-      console.warn(`  ⚠ ${result.message}`);
+      console.warn(`   ${result.message}`);
       if (result.error) {
         // Check for specific error types
         if (result.error.includes('EACCES') || result.error.includes('EPERM')) {
@@ -217,9 +217,9 @@ export async function copyAssets(assets: Array<{ from: string; to: string }>) {
   const totalTime = timer.elapsed();
 
   if (failedAssets.length === 0) {
-    console.log(`✓ Assets copied (${totalTime}ms)`);
+    console.log(` Assets copied (${totalTime}ms)`);
   } else if (successCount > 0) {
-    console.warn(`⚠ Copied ${successCount}/${assets.length} assets (${totalTime}ms)`);
+    console.warn(` Copied ${successCount}/${assets.length} assets (${totalTime}ms)`);
     console.warn(`  Failed assets: ${failedAssets.map((f) => f.asset.from).join(', ')}`);
   } else {
     throw new Error(
@@ -244,9 +244,9 @@ export async function generateDts(tsconfigPath = './tsconfig.build.json', throwO
   try {
     // Use incremental compilation for faster subsequent builds
     await $`tsc --emitDeclarationOnly --project ${tsconfigPath} --composite false --incremental false --types node,bun`;
-    console.log(`✓ TypeScript declarations generated successfully (${timer.elapsed()}ms)`);
+    console.log(` TypeScript declarations generated successfully (${timer.elapsed()}ms)`);
   } catch (error: unknown) {
-    console.error(`✗ Failed to generate TypeScript declarations (${timer.elapsed()}ms)`);
+    console.error(` Failed to generate TypeScript declarations (${timer.elapsed()}ms)`);
     console.error('Error details:', error instanceof Error ? error.message : String(error));
 
     if (throwOnError) {
@@ -265,7 +265,7 @@ export async function cleanBuild(outdir = 'dist', maxRetries = 3) {
   const { rm } = await import('node:fs/promises');
 
   if (!existsSync(outdir)) {
-    console.log(`✓ ${outdir} directory already clean (${timer.elapsed()}ms)`);
+    console.log(` ${outdir} directory already clean (${timer.elapsed()}ms)`);
     return;
   }
 
@@ -274,7 +274,7 @@ export async function cleanBuild(outdir = 'dist', maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       await rm(outdir, { recursive: true, force: true });
-      console.log(`✓ Cleaned ${outdir} directory (${timer.elapsed()}ms)`);
+      console.log(` Cleaned ${outdir} directory (${timer.elapsed()}ms)`);
       return; // Success, exit the function
     } catch (error: unknown) {
       lastError = error;
@@ -282,26 +282,26 @@ export async function cleanBuild(outdir = 'dist', maxRetries = 3) {
 
       // Check for specific error types
       if (errorMessage.includes('EACCES') || errorMessage.includes('EPERM')) {
-        console.error(`✗ Permission denied while cleaning ${outdir}`);
+        console.error(` Permission denied while cleaning ${outdir}`);
         console.error(`  Try running with elevated privileges or check file permissions.`);
         throw error; // Don't retry permission errors
       } else if (errorMessage.includes('ENOENT')) {
         // Directory was already deleted (possibly by concurrent process)
-        console.log(`✓ ${outdir} directory was already removed (${timer.elapsed()}ms)`);
+        console.log(` ${outdir} directory was already removed (${timer.elapsed()}ms)`);
         return;
       } else if (errorMessage.includes('EBUSY') || errorMessage.includes('EMFILE')) {
         // Resource busy or too many open files - these might be temporary
         if (attempt < maxRetries) {
           const waitTime = attempt * 500; // Exponential backoff: 500ms, 1000ms, 1500ms
           console.warn(
-            `⚠ Failed to clean ${outdir} (attempt ${attempt}/${maxRetries}): ${errorMessage}`
+            ` Failed to clean ${outdir} (attempt ${attempt}/${maxRetries}): ${errorMessage}`
           );
           console.warn(`  Retrying in ${waitTime}ms...`);
           await new Promise((resolve) => setTimeout(resolve, waitTime));
         }
       } else {
         // Unknown error
-        console.error(`✗ Failed to clean ${outdir}: ${errorMessage}`);
+        console.error(` Failed to clean ${outdir}: ${errorMessage}`);
         throw error;
       }
     }
@@ -309,7 +309,7 @@ export async function cleanBuild(outdir = 'dist', maxRetries = 3) {
 
   // If we've exhausted all retries
   const finalError = lastError instanceof Error ? lastError : new Error(String(lastError));
-  console.error(`✗ Failed to clean ${outdir} after ${maxRetries} attempts`);
+  console.error(` Failed to clean ${outdir} after ${maxRetries} attempts`);
   throw finalError;
 }
 
@@ -330,8 +330,8 @@ export function watchFiles(
   let watcher: FSWatcher | null = null;
   let isCleanedUp = false;
 
-  console.log(`📁 Watching ${directory} for changes...`);
-  console.log('💡 Press Ctrl+C to stop\n');
+  console.log(` Watching ${directory} for changes...`);
+  console.log(' Press Ctrl+C to stop\n');
 
   // Cleanup function to close watcher and clear timers
   const cleanup = () => {
@@ -366,7 +366,7 @@ export function watchFiles(
 
         debounceTimer = setTimeout(() => {
           if (!isCleanedUp) {
-            console.log(`\n📝 File changed: ${filename}`);
+            console.log(`\n File changed: ${filename}`);
             onChange();
           }
         }, debounceMs);
@@ -389,7 +389,7 @@ export function watchFiles(
     console.error(`Failed to start file watcher: ${errorMessage}`);
 
     if (errorMessage.includes('EMFILE')) {
-      console.error('\n⚠️  Too many open files error detected!');
+      console.error('\n  Too many open files error detected!');
       console.error('Try one of these solutions:');
       console.error('  1. Increase system file limit: ulimit -n 4096');
       console.error('  2. Close other applications using file watchers');
@@ -402,7 +402,7 @@ export function watchFiles(
   // Register cleanup handlers only once per watcher
   const handleExit = () => {
     cleanup();
-    console.log('\n\n👋 Stopping watch mode...');
+    console.log('\n\n Stopping watch mode...');
     process.exit(0);
   };
 
@@ -441,9 +441,9 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
   if (isRebuild) {
     console.clear();
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`[${timestamp}] 🔄 Rebuilding ${packageName}...\n`);
+    console.log(`[${timestamp}]  Rebuilding ${packageName}...\n`);
   } else {
-    console.log(`🚀 Building ${packageName}...\n`);
+    console.log(` Building ${packageName}...\n`);
   }
 
   try {
@@ -453,7 +453,7 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
     // Create build configuration
     const configTimer = getTimer();
     const config = await createElizaBuildConfig(buildOptions);
-    console.log(`✓ Configuration prepared (${configTimer.elapsed()}ms)`);
+    console.log(` Configuration prepared (${configTimer.elapsed()}ms)`);
 
     // Build with Bun
     console.log('\nBundling with Bun...');
@@ -461,7 +461,7 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
     const result = await Bun.build(config);
 
     if (!result.success) {
-      console.error('✗ Build failed:', result.logs);
+      console.error(' Build failed:', result.logs);
       onBuildComplete?.(false);
       return false;
     }
@@ -469,7 +469,7 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
     const totalSize = result.outputs.reduce((sum, output) => sum + output.size, 0);
     const sizeMB = (totalSize / 1024 / 1024).toFixed(2);
     console.log(
-      `✓ Built ${result.outputs.length} file(s) - ${sizeMB}MB (${buildTimer.elapsed()}ms)`
+      ` Built ${result.outputs.length} file(s) - ${sizeMB}MB (${buildTimer.elapsed()}ms)`
     );
 
     // Run post-build tasks
@@ -479,7 +479,7 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
     if (buildOptions.generateDts) {
       postBuildTasks.push(
         generateDts('./tsconfig.build.json').catch((err) => {
-          console.error('⚠ TypeScript declarations generation failed:', err);
+          console.error(' TypeScript declarations generation failed:', err);
           // Don't throw here, as it's often non-critical
           return null;
         })
@@ -490,7 +490,7 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
     if (buildOptions.assets?.length) {
       postBuildTasks.push(
         copyAssets(buildOptions.assets).catch((err) => {
-          console.error('✗ Asset copying failed:', err);
+          console.error(' Asset copying failed:', err);
           throw err; // Asset copying failure is critical
         })
       );
@@ -500,11 +500,11 @@ export async function runBuild(options: BuildRunnerOptions & { isRebuild?: boole
     if (postBuildTasks.length > 0) {
       const postBuildTimer = getTimer();
       await Promise.all(postBuildTasks);
-      console.log(`✓ Post-build tasks completed (${postBuildTimer.elapsed()}ms)`);
+      console.log(` Post-build tasks completed (${postBuildTimer.elapsed()}ms)`);
     }
 
-    console.log(`\n✅ ${packageName} build complete!`);
-    console.log(`⏱️  Total build time: ${totalTimer.elapsed()}ms`);
+    console.log(`\n ${packageName} build complete!`);
+    console.log(`  Total build time: ${totalTimer.elapsed()}ms`);
 
     onBuildComplete?.(true);
     return true;
@@ -530,7 +530,7 @@ export function createBuildRunner(options: BuildRunnerOptions) {
   }
 
   async function startWatchMode() {
-    console.log('👀 Starting watch mode...\n');
+    console.log(' Starting watch mode...\n');
 
     // Initial build
     const buildSuccess = await build(false);
@@ -543,8 +543,8 @@ export function createBuildRunner(options: BuildRunnerOptions) {
         // The watcher stays active throughout the entire session
         cleanupWatcher = watchFiles(srcDir, async () => {
           await build(true);
-          console.log('📁 Watching src/ directory for changes...');
-          console.log('💡 Press Ctrl+C to stop\n');
+          console.log(' Watching src/ directory for changes...');
+          console.log(' Press Ctrl+C to stop\n');
         });
       } catch (error: unknown) {
         console.error('Failed to start watch mode:', error);

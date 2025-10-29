@@ -93,7 +93,7 @@ export function NFTDetailModalContent({ nft, userId, onSuccess }: NFTDetailModal
     try {
       setError('');
 
-      console.log('🎨 Sending NFT:', {
+      console.log(' Sending NFT:', {
         contract: nft.contractAddress,
         tokenId: nft.tokenId,
         to: recipientAddress,
@@ -114,7 +114,7 @@ export function NFTDetailModalContent({ nft, userId, onSuccess }: NFTDetailModal
         tokenId: nft.tokenId,
       });
 
-      console.log('✅ NFT sent successfully:', result);
+      console.log(' NFT sent successfully:', result);
       
       // Show success modal
       showModal(
@@ -134,7 +134,7 @@ export function NFTDetailModalContent({ nft, userId, onSuccess }: NFTDetailModal
         }, 2000);
       }
     } catch (err: any) {
-      console.error('❌ NFT send failed:', err);
+      console.error(' NFT send failed:', err);
       setError(err.message || 'Failed to send NFT');
       hideModal('nft-sending');
     }

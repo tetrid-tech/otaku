@@ -131,7 +131,7 @@ export function SendModalContent({ tokens, userId, onSuccess }: SendModalContent
         tokenParam = selectedToken.contractAddress;
       }
 
-      console.log('📤 Sending transaction:', {
+      console.log(' Sending transaction:', {
         network: selectedToken.chain,
         to: recipientAddress,
         token: tokenParam,
@@ -146,7 +146,7 @@ export function SendModalContent({ tokens, userId, onSuccess }: SendModalContent
         amount: amountInBaseUnits,
       });
 
-      console.log('✅ Transaction sent:', data);
+      console.log(' Transaction sent:', data);
       
       // Show success and trigger wallet refresh
       showSuccess(
@@ -165,7 +165,7 @@ export function SendModalContent({ tokens, userId, onSuccess }: SendModalContent
       onSuccess();
       
     } catch (err: any) {
-      console.error('❌ Send failed:', err);
+      console.error(' Send failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to send transaction';
       showError('Transaction Failed', errorMessage, modalId);
     }
@@ -303,7 +303,7 @@ export function SendModalContent({ tokens, userId, onSuccess }: SendModalContent
         {selectedToken && (
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Balance: {parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.symbol}</span>
-            {amount && isValidAmount && <span>≈ ${usdValue.toFixed(2)}</span>}
+            {amount && isValidAmount && <span> ${usdValue.toFixed(2)}</span>}
           </div>
         )}
         {amount && !isValidAmount && (

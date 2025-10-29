@@ -64,7 +64,7 @@ export function Modal({
             className="absolute top-6 right-6 z-[100] text-muted-foreground hover:text-foreground transition-colors text-xl leading-none"
             aria-label="Close modal"
           >
-            ✕
+            
           </button>
         )}
         

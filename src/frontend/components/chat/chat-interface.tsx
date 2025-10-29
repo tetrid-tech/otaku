@@ -184,7 +184,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
   // Clear messages when entering new chat mode
   useEffect(() => {
     if (isNewChatMode && !channelId) {
-      console.log('🆕 Entering new chat mode - clearing messages')
+      console.log(' Entering new chat mode - clearing messages')
       setMessages([])
     }
   }, [isNewChatMode, channelId])
@@ -197,7 +197,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     async function loadMessages() {
       try {
         setIsLoadingMessages(true)
-        console.log('📨 Loading messages for channel:', channelId)
+        console.log(' Loading messages for channel:', channelId)
         const messagesResponse = await elizaClient.messaging.getChannelMessages(channelId as UUID, {
           limit: 50,
         })
@@ -234,9 +234,9 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
         setIsLoadingMessages(false)
         isUserScrollingRef.current = false // User is not scrolling when loading messages
         setTimeout(() => scrollToBottom('smooth'), 0)
-        console.log(`✅ Loaded ${sortedMessages.length} messages`)
+        console.log(` Loaded ${sortedMessages.length} messages`)
       } catch (error: any) {
-        console.error('❌ Failed to load messages:', error)
+        console.error(' Failed to load messages:', error)
       } finally {
         setIsLoadingMessages(false)
       }
@@ -251,7 +251,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     if (!channelId) return undefined
 
     const handleNewMessage = (data: any) => {
-      console.log('📩 New message received:', data)
+      console.log(' New message received:', data)
       
       const messageId = data.id || crypto.randomUUID()
       const newMessage: Message = {
@@ -296,7 +296,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
         // Check if this is a multi-step summary message
         const actions = newMessage.rawMessage?.actions || newMessage.metadata?.actions || []
         const isSummaryMessage = actions.includes('MULTI_STEP_SUMMARY')
-        const isErrorMessage = newMessage.content.startsWith('⚠️ Error:')
+        const isErrorMessage = newMessage.content.startsWith(' Error:')
         
         // Only stop typing for summary or error messages
         if (isSummaryMessage || isErrorMessage) {
@@ -306,7 +306,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
           
           // If it's a summary message, trigger wallet refresh
           if (isSummaryMessage && onActionCompleted) {
-            console.log('✅ Agent action completed - triggering wallet refresh')
+            console.log(' Agent action completed - triggering wallet refresh')
             onActionCompleted()
           }
           
@@ -324,7 +324,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     try {
       unsubscribe = socketManager.onMessage(handleNewMessage)
     } catch (error) {
-      console.warn('⚠️ Failed to subscribe to messages (socket not ready):', error)
+      console.warn(' Failed to subscribe to messages (socket not ready):', error)
       return undefined
     }
 
@@ -342,22 +342,22 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     
     // If in new chat mode, create channel first with generated title
     if (isNewChatMode && !channelId) {
-      console.log('🆕 [ChatInterface] First message in new chat mode, creating channel...')
+      console.log(' [ChatInterface] First message in new chat mode, creating channel...')
       setIsCreatingChannel(true)
       setIsTyping(true)
       
       try {
         // STEP 1: Generate title from user's message
-        console.log('🏷️ Generating title from user message:', inputValue)
+        console.log(' Generating title from user message:', inputValue)
         const titleResponse = await elizaClient.messaging.generateChannelTitle(
           inputValue, // Pass the message as string
           agent.id as UUID
         )
         const generatedTitle = titleResponse.title || inputValue.substring(0, 50)
-        console.log('✅ Generated title:', generatedTitle)
+        console.log(' Generated title:', generatedTitle)
 
         // STEP 2: Create channel in DB with the generated title
-        console.log('💾 Creating channel with title:', generatedTitle)
+        console.log(' Creating channel with title:', generatedTitle)
         const now = Date.now()
         const newChannel = await elizaClient.messaging.createGroupChannel({
           name: generatedTitle,
@@ -372,7 +372,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
             createdAt: new Date(now).toISOString(),
           },
         })
-        console.log('✅ Channel created:', newChannel.id)
+        console.log(' Channel created:', newChannel.id)
 
         // STEP 3: Notify parent component
         onChannelCreated?.(newChannel.id, generatedTitle)
@@ -381,7 +381,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
         // The socket join will happen automatically via App.tsx's useEffect
         // Wait a brief moment for the channel to be set as active
         setTimeout(() => {
-          console.log('🚀 Sending initial message to new channel:', newChannel.id)
+          console.log(' Sending initial message to new channel:', newChannel.id)
           socketManager.sendMessage(newChannel.id, inputValue, serverId, {
             userId,
             isDm: true,
@@ -391,7 +391,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
 
         setInputValue('')
       } catch (error: any) {
-        console.error('❌ Failed to create channel:', error)
+        console.error(' Failed to create channel:', error)
         const errorMessage = error?.message || 'Failed to create chat. Please try again.'
         setError(errorMessage)
         setIsTyping(false)
@@ -403,11 +403,11 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     
     // Normal message sending (channel already exists)
     if (!channelId) {
-      console.warn('⚠️ Cannot send message: No channel ID')
+      console.warn(' Cannot send message: No channel ID')
       return
     }
     
-    console.log('🚀 [ChatInterface] Sending message:', {
+    console.log(' [ChatInterface] Sending message:', {
       channelId,
       text: inputValue,
       serverId,
@@ -446,22 +446,22 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     
     // If in new chat mode, create channel first with generated title
     if (isNewChatMode && !channelId) {
-      console.log('🆕 [ChatInterface] Quick prompt in new chat mode, creating channel...')
+      console.log(' [ChatInterface] Quick prompt in new chat mode, creating channel...')
       setIsCreatingChannel(true)
       setIsTyping(true)
       
       try {
         // STEP 1: Generate title from user's message
-        console.log('🏷️ Generating title from user message:', message)
+        console.log(' Generating title from user message:', message)
         const titleResponse = await elizaClient.messaging.generateChannelTitle(
           message, // Pass the message as string
           agent.id as UUID
         )
         const generatedTitle = titleResponse.title || message.substring(0, 50)
-        console.log('✅ Generated title:', generatedTitle)
+        console.log(' Generated title:', generatedTitle)
 
         // STEP 2: Create channel in DB with the generated title
-        console.log('💾 Creating channel with title:', generatedTitle)
+        console.log(' Creating channel with title:', generatedTitle)
         const now = Date.now()
         const newChannel = await elizaClient.messaging.createGroupChannel({
           name: generatedTitle,
@@ -476,14 +476,14 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
             createdAt: new Date(now).toISOString(),
           },
         })
-        console.log('✅ Channel created:', newChannel.id)
+        console.log(' Channel created:', newChannel.id)
 
         // STEP 3: Notify parent component
         onChannelCreated?.(newChannel.id, generatedTitle)
 
         // STEP 4: Send the message (channel is now created and will be set as active)
         setTimeout(() => {
-          console.log('🚀 Sending initial message to new channel:', newChannel.id)
+          console.log(' Sending initial message to new channel:', newChannel.id)
           socketManager.sendMessage(newChannel.id, message, serverId, {
             userId,
             isDm: true,
@@ -491,7 +491,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
           })
         }, 100)
       } catch (error: any) {
-        console.error('❌ Failed to create channel:', error)
+        console.error(' Failed to create channel:', error)
         const errorMessage = error?.message || 'Failed to create chat. Please try again.'
         setError(errorMessage)
         setIsTyping(false)
@@ -503,11 +503,11 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
     
     // Normal quick prompt (channel already exists)
     if (!channelId) {
-      console.warn('⚠️ Cannot send message: No channel ID')
+      console.warn(' Cannot send message: No channel ID')
       return
     }
     
-    console.log('🚀 [ChatInterface] Sending quick prompt:', {
+    console.log(' [ChatInterface] Sending quick prompt:', {
       channelId,
       text: message,
       serverId,
@@ -660,7 +660,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                 const shouldAnimate = message.isAgent && isLastMessage && isRecent
                 
                 // Check if this is an error message from the agent
-                const isErrorMessage = message.isAgent && message.content.startsWith('⚠️ Error:')
+                const isErrorMessage = message.isAgent && message.content.startsWith(' Error:')
 
                 return (
                   <div
@@ -723,7 +723,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                 <div className="flex flex-col gap-1 items-center">
                   <div className="max-w-[90%] rounded-lg px-4 py-3 bg-destructive/10 border border-destructive/20 text-destructive">
                     <div className="flex items-start gap-2">
-                      <span className="text-sm font-medium">⚠️ {error}</span>
+                      <span className="text-sm font-medium"> {error}</span>
                     </div>
                     <button
                       onClick={() => setError(null)}
@@ -799,7 +799,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                       onClick={() => setShowPromptsModal(false)}
                       className="text-muted-foreground hover:text-foreground"
                     >
-                      ✕
+                      
                     </button>
                   </div>
                   <div className="grid grid-cols-1 gap-2">

@@ -69,7 +69,7 @@ export function SignInModal({ isOpen }: SignInModalProps) {
   // Monitor OAuth state - MUST BE CALLED BEFORE ANY RETURN
   useEffect(() => {
     if (oauthHook?.oauthState?.status === 'success') {
-      console.log("✅ Google OAuth successful!");
+      console.log(" Google OAuth successful!");
       resetForm();
     } else if (oauthHook?.oauthState?.status === 'error') {
       setError('Google sign-in failed. Please try again.');
@@ -97,14 +97,14 @@ export function SignInModal({ isOpen }: SignInModalProps) {
     setError('');
     setIsLoading(true);
     try {
-      console.log("📧 Attempting email sign-in with:", email);
+      console.log(" Attempting email sign-in with:", email);
       const result = await emailHook.signInWithEmail({ email });
-      console.log("✅ Sign-in successful, flowId:", result.flowId);
+      console.log(" Sign-in successful, flowId:", result.flowId);
       setFlowId(result.flowId);
       setAuthStep('verification');
-      console.log("✉️ OTP sent to:", email);
+      console.log(" OTP sent to:", email);
     } catch (err: any) {
-      console.error("❌ CDP email sign in failed:", err);
+      console.error(" CDP email sign in failed:", err);
       console.error("Error details:", JSON.stringify(err, null, 2));
       const errorMessage = err?.message || err?.errorMessage || 'Failed to send OTP';
       setError(errorMessage);
@@ -120,13 +120,13 @@ export function SignInModal({ isOpen }: SignInModalProps) {
     setIsLoading(true);
     try {
       const fullPhoneNumber = `${countryCode}${phoneNumber}`;
-      console.log("📱 Attempting SMS sign-in with:", fullPhoneNumber);
+      console.log(" Attempting SMS sign-in with:", fullPhoneNumber);
       const result = await smsHook.signInWithSms({ phoneNumber: fullPhoneNumber });
       setFlowId(result.flowId);
       setAuthStep('verification');
-      console.log("📱 OTP sent to:", fullPhoneNumber);
+      console.log(" OTP sent to:", fullPhoneNumber);
     } catch (err: any) {
-      console.error("❌ CDP SMS sign in failed:", err);
+      console.error(" CDP SMS sign in failed:", err);
       const errorMessage = err?.message || err?.errorMessage || 'Failed to send SMS OTP';
       setError(errorMessage);
     } finally {
@@ -141,10 +141,10 @@ export function SignInModal({ isOpen }: SignInModalProps) {
     setIsLoading(true);
     try {
       const { user } = await emailOtpHook.verifyEmailOTP({ flowId, otp });
-      console.log("✅ CDP wallet connected via email!", user.evmAccounts?.[0]);
+      console.log(" CDP wallet connected via email!", user.evmAccounts?.[0]);
       resetForm();
     } catch (err: any) {
-      console.error("❌ CDP email OTP verification failed:", err);
+      console.error(" CDP email OTP verification failed:", err);
       const errorMessage = err?.message || err?.errorMessage || 'Invalid OTP code';
       setError(errorMessage);
     } finally {
@@ -159,10 +159,10 @@ export function SignInModal({ isOpen }: SignInModalProps) {
     setIsLoading(true);
     try {
       const { user } = await smsOtpHook.verifySmsOTP({ flowId, otp });
-      console.log("✅ CDP wallet connected via SMS!", user.evmAccounts?.[0]);
+      console.log(" CDP wallet connected via SMS!", user.evmAccounts?.[0]);
       resetForm();
     } catch (err: any) {
-      console.error("❌ CDP SMS OTP verification failed:", err);
+      console.error(" CDP SMS OTP verification failed:", err);
       const errorMessage = err?.message || err?.errorMessage || 'Invalid OTP code';
       setError(errorMessage);
     } finally {
@@ -177,10 +177,10 @@ export function SignInModal({ isOpen }: SignInModalProps) {
     setIsLoading(true);
     try {
       await oauthHook.signInWithOAuth('google' as OAuth2ProviderType);
-      console.log("🔵 Redirecting to Google OAuth...");
+      console.log(" Redirecting to Google OAuth...");
       // OAuth will redirect, so we don't need to do anything else
     } catch (err: any) {
-      console.error("❌ CDP Google OAuth failed:", err);
+      console.error(" CDP Google OAuth failed:", err);
       const errorMessage = err?.message || err?.errorMessage || 'Failed to start Google sign-in';
       setError(errorMessage);
       setIsLoading(false);
@@ -282,15 +282,15 @@ export function SignInModal({ isOpen }: SignInModalProps) {
                     style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
                     disabled={isLoading}
                   >
-                    <option value="+1">🇺🇸 +1</option>
-                    <option value="+55">🇧🇷 +55</option>
-                    <option value="+57">🇨🇴 +57</option>
-                    <option value="+91">🇮🇳 +91</option>
-                    <option value="+254">🇰🇪 +254</option>
-                    <option value="+52">🇲🇽 +52</option>
-                    <option value="+63">🇵🇭 +63</option>
-                    <option value="+971">🇦🇪 +971</option>
-                    <option value="+44">🇬🇧 +44</option>
+                    <option value="+1"> +1</option>
+                    <option value="+55"> +55</option>
+                    <option value="+57"> +57</option>
+                    <option value="+91"> +91</option>
+                    <option value="+254"> +254</option>
+                    <option value="+52"> +52</option>
+                    <option value="+63"> +63</option>
+                    <option value="+971"> +971</option>
+                    <option value="+44"> +44</option>
                   </select>
                   <Input
                     type="tel"

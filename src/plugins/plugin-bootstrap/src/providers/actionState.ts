@@ -39,14 +39,14 @@ export const actionStateProvider: Provider = {
           ...actionPlan.steps.map((step: any, index: number) => {
             const icon =
               step.status === 'completed'
-                ? '✓'
+                ? ''
                 : step.status === 'failed'
-                  ? '✗'
+                  ? ''
                   : index < actionPlan.currentStep - 1
-                    ? '○'
+                    ? ''
                     : index === actionPlan.currentStep - 1
-                      ? '→'
-                      : '○';
+                      ? ''
+                      : '';
             const status =
               step.status === 'pending' && index === actionPlan.currentStep - 1
                 ? 'in progress'

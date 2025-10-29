@@ -14,7 +14,7 @@ async function main() {
 
   // Initialize server with custom client path
   await server.initialize({
-    clientPath: path.resolve(__dirname, 'dist/frontend'), // ✅ Point to OUR custom UI
+    clientPath: path.resolve(__dirname, 'dist/frontend'), //  Point to OUR custom UI
     dataDir: process.env.PGLITE_DATA_DIR || path.resolve(__dirname, '.eliza/.elizadb'),
     postgresUrl: process.env.POSTGRES_URL,
   });
@@ -31,7 +31,7 @@ async function main() {
     // Flatten plugin arrays from all agents
     const allPlugins = projectModule.agents.flatMap((agent: any) => agent.plugins || []);
     await server.startAgents(characters, allPlugins);
-    console.log(`✅ Started ${characters.length} agent(s)`);
+    console.log(` Started ${characters.length} agent(s)`);
   } else {
     throw new Error('No agents found in project');
   }
@@ -40,7 +40,7 @@ async function main() {
   const port = parseInt(process.env.SERVER_PORT || '3000');
   await server.start(port);
 
-  console.log(`\n🎉 Server with custom UI running on http://localhost:${port}\n`);
+  console.log(`\n Server with custom UI running on http://localhost:${port}\n`);
 }
 
 main().catch((error) => {

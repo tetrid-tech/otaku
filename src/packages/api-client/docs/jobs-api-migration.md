@@ -220,14 +220,14 @@ const jobs: JobListResponse = await client.jobs.list({
 ## Testing
 
 All 20 Jobs API tests pass successfully:
-- ✅ Job creation
-- ✅ Job status retrieval
-- ✅ Job listing and filtering
-- ✅ Health checks
-- ✅ Polling with retries
-- ✅ Progress callbacks
-- ✅ Error handling
-- ✅ Timeout scenarios
+-  Job creation
+-  Job status retrieval
+-  Job listing and filtering
+-  Health checks
+-  Polling with retries
+-  Progress callbacks
+-  Error handling
+-  Timeout scenarios
 
 ## Next Steps
 

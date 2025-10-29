@@ -291,7 +291,7 @@ export function SwapModalContent({ tokens, userId, onSuccess }: SwapModalContent
         slippageBps,
       });
 
-      console.log('✅ Swap successful:', result);
+      console.log(' Swap successful:', result);
       
       // Show success
       showSuccess(
@@ -545,7 +545,7 @@ export function SwapModalContent({ tokens, userId, onSuccess }: SwapModalContent
                     <div className="text-left">
                       <p className="text-sm font-medium">
                         {toToken.symbol}
-                        {toToken.isExternal && <span className="ml-1 text-xs text-blue-500">🌐</span>}
+                        {toToken.isExternal && <span className="ml-1 text-xs text-blue-500"></span>}
                       </p>
                       <p className="text-xs text-muted-foreground">{toToken.chain.toUpperCase()}</p>
                     </div>
@@ -647,7 +647,7 @@ export function SwapModalContent({ tokens, userId, onSuccess }: SwapModalContent
                           <div className="text-left">
                             <p className="text-sm font-medium">
                               {token.symbol}
-                              {token.isExternal && <span className="ml-1 text-xs text-blue-500">🌐</span>}
+                              {token.isExternal && <span className="ml-1 text-xs text-blue-500"></span>}
                             </p>
                             <p className="text-xs text-muted-foreground">{token.chain.toUpperCase()}</p>
                           </div>
@@ -663,7 +663,7 @@ export function SwapModalContent({ tokens, userId, onSuccess }: SwapModalContent
                                 t => t.chain === token.chain && 
                                 t.contractAddress?.toLowerCase() === token.contractAddress?.toLowerCase()
                               ) && (
-                                <p className="text-xs text-green-500">✓ Owned</p>
+                                <p className="text-xs text-green-500"> Owned</p>
                               )}
                             </>
                           ) : (
@@ -742,7 +742,7 @@ export function SwapModalContent({ tokens, userId, onSuccess }: SwapModalContent
       {/* Warning Message */}
       {warning && (
         <div className="text-xs text-yellow-500 bg-yellow-500/10 p-2 rounded border border-yellow-500/20">
-          ⚠️ {warning}
+           {warning}
         </div>
       )}
 

@@ -26,8 +26,8 @@ export const walletStateProvider: Provider = {
     const walletAddress = walletResult.success ? walletResult.walletAddress : "";
 
     const text = hasWallet
-      ? `🔐 Wallet is set up and ready. Address: \`${walletAddress}\` (provider: "cdp").`
-      : "🚀 To use on-chain features, the user needs a Coinbase CDP wallet. Ask to create one by signing in.";
+      ? ` Wallet is set up and ready. Address: \`${walletAddress}\` (provider: "cdp").`
+      : " To use on-chain features, the user needs a Coinbase CDP wallet. Ask to create one by signing in.";
 
     return {
       text,

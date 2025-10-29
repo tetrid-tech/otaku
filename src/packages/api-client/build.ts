@@ -53,7 +53,7 @@ export { RunsService } from './services/runs';
 export { BaseApiClient, ApiError } from './lib/base-client';
 `;
       await Bun.write('./dist/index.d.ts', rootDtsContent);
-      console.log('✓ Created root index.d.ts');
+      console.log(' Created root index.d.ts');
     }
   },
 });

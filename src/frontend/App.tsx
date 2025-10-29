@@ -37,7 +37,7 @@ async function authenticateUser(
   currentUser?: any
 ): Promise<{ userId: string; token: string }> {
   try {
-    console.log('🔐 Authenticating with backend...');
+    console.log(' Authenticating with backend...');
     
     // Extract CDP userId
     const cdpUserId = currentUser?.userId;
@@ -61,7 +61,7 @@ async function authenticateUser(
     
     return { userId, token };
   } catch (error) {
-    console.error('❌ Authentication failed:', error);
+    console.error(' Authentication failed:', error);
     throw error;
   }
 }
@@ -138,19 +138,19 @@ function App() {
   useEffect(() => {
     // If CDP is not configured, show error (authentication required)
     if (!import.meta.env.VITE_CDP_PROJECT_ID) {
-      console.error('❌ CDP_PROJECT_ID not configured - authentication unavailable');
+      console.error(' CDP_PROJECT_ID not configured - authentication unavailable');
       return;
     }
 
     // Wait for CDP to initialize
     if (!isInitialized) {
-      console.log('⏳ Waiting for CDP wallet to initialize...');
+      console.log(' Waiting for CDP wallet to initialize...');
       return;
     }
 
     // If user is not signed in, clear state and show sign-in modal
     if (!isSignedIn || !userEmail) {
-      console.log('🚫 User not signed in, waiting for authentication...');
+      console.log(' User not signed in, waiting for authentication...');
       setUserId(null);
       elizaClient.clearAuthToken();
       return;
@@ -162,7 +162,7 @@ function App() {
         const { userId, token } = await authenticateUser(userEmail as string, userName || 'User', currentUser);
         setUserId(userId);
       } catch (error) {
-        console.error('❌ Failed to authenticate:', error);
+        console.error(' Failed to authenticate:', error);
         setUserId(null);
       }
     }
@@ -192,7 +192,7 @@ function App() {
     const syncUserEntity = async () => {
       try {
         setIsLoadingUserProfile(true);
-        console.log('🔄 Syncing user entity for userId:', userId);
+        console.log(' Syncing user entity for userId:', userId);
 
         const wallet = await elizaClient.cdp.getOrCreateWallet(userId);
         const walletAddress = wallet.address;
@@ -201,11 +201,11 @@ function App() {
         let entity;
         try {
           entity = await elizaClient.entities.getEntity(userId as any);
-          console.log('✅ Found existing user entity in database');
+          console.log(' Found existing user entity in database');
         } catch (error: any) {
           // Entity doesn't exist, create it
           if (error?.status === 404 || error?.code === 'NOT_FOUND') {
-            console.log('📝 Creating new user entity in database...');
+            console.log(' Creating new user entity in database...');
             
             // Extract email and username using shared helper (DRY)
             const { email: cdpEmail, username: cdpUsername } = resolveCdpUserInfo(currentUser as any, { isSignedIn: true });
@@ -214,10 +214,10 @@ function App() {
             const finalEmail = cdpEmail || userEmail || `${currentUser?.userId}@cdp.local`;
             const finalUsername = cdpUsername || (cdpEmail ? cdpEmail.split('@')[0] : userName) || 'User';
             
-            console.log('👤 CDP provided username:', cdpUsername || '(not found)');
-            console.log('📧 CDP provided email:', cdpEmail || '(not found)');
-            console.log('💾 Saving to database - Username:', finalUsername);
-            console.log('💾 Saving to database - Email:', finalEmail);
+            console.log(' CDP provided username:', cdpUsername || '(not found)');
+            console.log(' CDP provided email:', cdpEmail || '(not found)');
+            console.log(' Saving to database - Username:', finalUsername);
+            console.log(' Saving to database - Email:', finalEmail);
             
             entity = await elizaClient.entities.createEntity({
               id: userId as any,
@@ -258,7 +258,7 @@ function App() {
           (userEmail && entity.metadata?.email !== userEmail);
 
         if (needsUpdate) {
-          console.log('📝 Updating user entity metadata...');
+          console.log(' Updating user entity metadata...');
           const updated = await elizaClient.entities.updateEntity(userId as any, {
             metadata: {
               ...entity.metadata,
@@ -270,10 +270,10 @@ function App() {
               updatedAt: new Date().toISOString(),
             },
           });
-          console.log('✅ Updated user entity:', updated);
+          console.log(' Updated user entity:', updated);
           entity = updated; // Use updated entity
         } else {
-          console.log('✅ User entity is up to date');
+          console.log(' User entity is up to date');
         }
         
         // Set user profile state from entity
@@ -287,7 +287,7 @@ function App() {
         });
         setIsLoadingUserProfile(false);
       } catch (error) {
-        console.error('❌ Error syncing user entity:', error);
+        console.error(' Error syncing user entity:', error);
       }
     };
 
@@ -310,21 +310,21 @@ function App() {
   useEffect(() => {
     if (!userId) return; // Wait for userId to be initialized
     
-    console.log('🔌 Connecting socket with userId:', userId);
+    console.log(' Connecting socket with userId:', userId);
     const socket = socketManager.connect(userId);
     
     socket.on('connect', () => {
       setConnected(true);
-      console.log('✅ Socket connected to server');
+      console.log(' Socket connected to server');
     });
     
     socket.on('disconnect', () => {
       setConnected(false);
-      console.log('❌ Socket disconnected from server');
+      console.log(' Socket disconnected from server');
     });
 
     return () => {
-      console.log('🔌 Cleaning up socket connection');
+      console.log(' Cleaning up socket connection');
       setConnected(false); // Set to false BEFORE disconnecting to prevent race conditions
       socketManager.disconnect();
     };
@@ -332,7 +332,7 @@ function App() {
 
   // Join active channel when it changes (this creates the user-specific server via Socket.IO)
   useEffect(() => {
-    console.log('🔌 Channel join useEffect triggered:', {
+    console.log(' Channel join useEffect triggered:', {
       activeChannelId,
       userId,
       connected,
@@ -341,7 +341,7 @@ function App() {
     });
     
     if (!activeChannelId || !userId || !connected || isNewChatMode) {
-      console.log('⏸️ Skipping channel join - waiting for:', {
+      console.log(' Skipping channel join - waiting for:', {
         needsChannelId: !activeChannelId,
         needsUserId: !userId,
         needsConnection: !connected,
@@ -350,11 +350,11 @@ function App() {
       return;
     }
     
-    console.log('🔌 Joining channel:', activeChannelId, 'with userId as serverId:', userId);
+    console.log(' Joining channel:', activeChannelId, 'with userId as serverId:', userId);
     socketManager.joinChannel(activeChannelId, userId, { isDm: true });
 
     return () => {
-      console.log('🔌 Leaving channel:', activeChannelId);
+      console.log(' Leaving channel:', activeChannelId);
       socketManager.leaveChannel(activeChannelId);
     };
   }, [activeChannelId, userId, connected, isNewChatMode]); // Join when active channel, userId, connection, or new chat mode changes
@@ -362,7 +362,7 @@ function App() {
   // Load channels when user ID or agent changes
   useEffect(() => {
     // Reset state when userId changes to show fresh data for the new user
-    console.log('🔄 User ID changed, refreshing chat content...');
+    console.log(' User ID changed, refreshing chat content...');
     setChannels([]);
     setActiveChannelId(null);
     setIsLoadingChannels(true);
@@ -377,7 +377,7 @@ function App() {
       try {
         // STEP 1: Create message server FIRST (before any channels)
         // This ensures the server_id exists for the foreign key constraint
-        console.log('📝 Creating message server for user:', userId);
+        console.log(' Creating message server for user:', userId);
         try {
           const serverResult = await elizaClient.messaging.createServer({
             id: userId as UUID,
@@ -390,26 +390,26 @@ function App() {
               userType: 'chat_user',
             },
           });
-          console.log('✅ Message server created/ensured:', serverResult.id);
+          console.log(' Message server created/ensured:', serverResult.id);
           
           // STEP 1.5: Associate agent with the user's server
           // This is CRITICAL - without this, the agent won't process messages from this server
-          console.log('🔗 Associating agent with user server...');
+          console.log(' Associating agent with user server...');
           try {
             await elizaClient.messaging.addAgentToServer(userId as any, agent.id as any);
-            console.log('✅ Agent associated with user server:', userId);
+            console.log(' Agent associated with user server:', userId);
           } catch (assocError: any) {
-            console.warn('⚠️ Failed to associate agent with server (may already be associated):', assocError.message);
+            console.warn(' Failed to associate agent with server (may already be associated):', assocError.message);
           }
         } catch (serverError: any) {
           // Server might already exist - that's fine
-          console.log('⚠️ Server creation failed (may already exist):', serverError.message);
+          console.log(' Server creation failed (may already exist):', serverError.message);
         }
 
         // STEP 2: Now load channels from the user-specific server
         const serverIdForQuery = userId;
-        console.log('📂 Loading channels from user-specific server:', serverIdForQuery);
-        console.log('👤 Agent ID:', agent.id);
+        console.log(' Loading channels from user-specific server:', serverIdForQuery);
+        console.log(' Agent ID:', agent.id);
         const response = await elizaClient.messaging.getServerChannels(serverIdForQuery as any);
         const dmChannels = await Promise.all(
           response.channels
@@ -440,7 +440,7 @@ function App() {
         const sortedChannels = dmChannels.sort((a: Channel, b: Channel) => (b.createdAt || 0) - (a.createdAt || 0));
         setChannels(sortedChannels);
         
-        console.log(`✅ Loaded ${sortedChannels.length} DM channels (sorted by creation time)`);
+        console.log(` Loaded ${sortedChannels.length} DM channels (sorted by creation time)`);
         sortedChannels.forEach((ch: Channel, i: number) => {
           const createdDate = ch.createdAt ? new Date(ch.createdAt).toLocaleString() : 'Unknown';
           console.log(`  ${i + 1}. ${ch.name} (${ch.id.substring(0, 8)}...) - Created: ${createdDate}`);
@@ -448,7 +448,7 @@ function App() {
         
         // If no channels exist and user hasn't seen channels yet, enter new chat mode
         if (sortedChannels.length === 0 && !hasInitialized.current) {
-          console.log('📝 No channels found, entering new chat mode...');
+          console.log(' No channels found, entering new chat mode...');
           hasInitialized.current = true;
           setIsNewChatMode(true);
           setActiveChannelId(null);
@@ -457,10 +457,10 @@ function App() {
           setActiveChannelId(sortedChannels[0].id);
           setIsNewChatMode(false);
           hasInitialized.current = true;
-          console.log(`✅ Auto-selected latest channel: ${sortedChannels[0].name} (${sortedChannels[0].id.substring(0, 8)}...)`);
+          console.log(` Auto-selected latest channel: ${sortedChannels[0].name} (${sortedChannels[0].id.substring(0, 8)}...)`);
         }
       } catch (error: any) {
-        console.warn('⚠️ Could not load channels:', error.message);
+        console.warn(' Could not load channels:', error.message);
       } finally {
         setIsLoadingChannels(false);
       }
@@ -474,7 +474,7 @@ function App() {
 
     // Simply enter "new chat" mode - no channel is created yet
     // Channel will be created when user sends first message
-    console.log('📝 Entering new chat mode (no channel created yet)');
+    console.log(' Entering new chat mode (no channel created yet)');
     setIsNewChatMode(true);
     setActiveChannelId(null);
   };
@@ -501,7 +501,7 @@ function App() {
     }
 
     try {
-      console.log('🔄 Updating user profile:', updates);
+      console.log(' Updating user profile:', updates);
       
       const updated = await elizaClient.entities.updateEntity(userId as UUID, {
         metadata: {
@@ -523,9 +523,9 @@ function App() {
         bio: updated.metadata?.bio || userProfile.bio,
       });
 
-      console.log('✅ User profile updated successfully');
+      console.log(' User profile updated successfully');
     } catch (error) {
-      console.error('❌ Failed to update user profile:', error);
+      console.error(' Failed to update user profile:', error);
       throw error;
     }
   };
@@ -715,7 +715,7 @@ function AppContent({
                     }}
                     onActionCompleted={async () => {
                       // Refresh wallet data when agent completes an action
-                      console.log('🔄 Agent action completed - refreshing wallet...');
+                      console.log(' Agent action completed - refreshing wallet...');
                       await walletRef.current?.refreshAll();
                     }}
                   />

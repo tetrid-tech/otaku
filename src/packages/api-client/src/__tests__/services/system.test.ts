@@ -314,8 +314,8 @@ describe('SystemService', () => {
     it('should handle update with unicode characters', async () => {
       const unicodeConfig = {
         variables: {
-          MESSAGE: '测试消息 🚀',
-          EMOJI: '🎉',
+          MESSAGE: '测试消息 ',
+          EMOJI: '',
           ARABIC: 'مرحبا',
         },
       };

@@ -30,11 +30,11 @@ class SocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Connected to Eliza server');
+      console.log(' Connected to Eliza server');
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ Disconnected from Eliza server:', reason);
+      console.log(' Disconnected from Eliza server:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
@@ -83,7 +83,7 @@ class SocketManager {
       metadata,
     };
     
-    console.log('📤 [SocketManager] Emitting SEND_MESSAGE:', payload);
+    console.log(' [SocketManager] Emitting SEND_MESSAGE:', payload);
     
     this.socket.emit('message', {
       type: SOCKET_MESSAGE_TYPE.SEND_MESSAGE,

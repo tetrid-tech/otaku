@@ -55,28 +55,28 @@ const exampleCharacter = {
 };
 
 async function main() {
-  console.log('🚀 Starting ElizaOS Server independently...');
+  console.log(' Starting ElizaOS Server independently...');
 
   try {
     // Create the agent server instance
-    console.log('📦 Creating AgentServer instance...');
+    console.log(' Creating AgentServer instance...');
     const server = new AgentServer();
 
     // Initialize the server with optional configuration
-    console.log('⚙️  Initializing server with database and services...');
+    console.log('  Initializing server with database and services...');
     await server.initialize({
       dataDir: './data', // Optional custom data directory
       middlewares: [], // Optional custom middlewares
       // postgresUrl: process.env.DATABASE_URL // Optional PostgreSQL connection
     });
 
-    console.log('✅ Server initialized successfully');
+    console.log(' Server initialized successfully');
 
     // Note: In a real implementation, you would create an AgentRuntime
     // and register it with the server. For this example, we're showing
     // the server initialization process.
 
-    console.log('🎯 Creating example agent runtime...');
+    console.log(' Creating example agent runtime...');
     // const runtime = new AgentRuntime({
     //   character: exampleCharacter,
     //   database: server.database,
@@ -84,33 +84,33 @@ async function main() {
     // });
 
     // await server.registerAgent(runtime);
-    console.log('📝 Note: Agent registration requires full AgentRuntime setup');
+    console.log('• Note: Agent registration requires full AgentRuntime setup');
 
     // Start the server on specified port
     const port = process.env.PORT || 3000;
-    console.log(`🌐 Starting server on port ${port}...`);
+    console.log(` Starting server on port ${port}...`);
 
     server.start(port);
 
-    console.log(`✨ Server is running at http://localhost:${port}`);
-    console.log('🎭 Dashboard available at the root URL');
-    console.log('🔌 API endpoints available at /api/*');
-    console.log('📡 WebSocket available for real-time communication');
+    console.log(` Server is running at http://localhost:${port}`);
+    console.log(' Dashboard available at the root URL');
+    console.log(' API endpoints available at /api/*');
+    console.log(' WebSocket available for real-time communication');
 
     // Graceful shutdown handling
     process.on('SIGINT', async () => {
-      console.log('\n🛑 Shutting down server gracefully...');
+      console.log('\n Shutting down server gracefully...');
       await server.stop();
       process.exit(0);
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    console.error(' Failed to start server:', error);
     process.exit(1);
   }
 }
 
 // Environment variable examples
-console.log('📋 Environment Variables (optional):');
+console.log(' Environment Variables (optional):');
 console.log('   PORT=3000                    # Server port');
 console.log('   DATABASE_URL=postgres://...  # PostgreSQL connection');
 console.log('   ELIZA_SERVER_AUTH_TOKEN=...  # API authentication');

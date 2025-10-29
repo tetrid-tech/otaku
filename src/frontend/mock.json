@@ -22,7 +22,7 @@
       "description": "THE CLIENT ALWAYS IS RIGHT",
       "intent": "neutral",
       "icon": "boom",
-      "tag": "4 weeks 🔥"
+      "tag": "4 weeks "
     }
   ],
   "chartData": {
@@ -123,11 +123,11 @@
       "id": 1,
       "name": "KRIMSON",
       "handle": "@KRIMSON",
-      "streak": "2 WEEKS STREAK 🔥",
+      "streak": "2 WEEKS STREAK ",
       "points": 148,
       "avatar": "/avatars/user_krimson.png",
       "featured": true,
-      "subtitle": "2 WEEKS STREAK 🔥"
+      "subtitle": "2 WEEKS STREAK "
     },
     {
       "id": 2,

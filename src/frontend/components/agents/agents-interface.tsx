@@ -37,7 +37,7 @@ export default function AgentsInterface({ agents }: AgentsInterfaceProps) {
         <DashboardCard title="AGENT CHAT" intent="default">
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <span className="text-3xl">🤖</span>
+              <span className="text-3xl"></span>
             </div>
             <div>
               <h3 className="text-xl font-display mb-2">SELECT AN AGENT</h3>

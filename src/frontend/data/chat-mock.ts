@@ -56,7 +56,7 @@ const conversations: ChatConversation[] = [
     unreadCount: 1,
     lastMessage: {
       id: "msg-krimson-1",
-      content: "💪💪💪💪💪",
+      content: "",
       timestamp: "2024-07-10T16:00:00Z",
       senderId: "krimson",
       isFromCurrentUser: false,
@@ -64,7 +64,7 @@ const conversations: ChatConversation[] = [
     messages: [
       {
         id: "msg-krimson-1",
-        content: "💪💪💪💪💪",
+        content: "",
         timestamp: "2024-07-10T16:00:00Z",
         senderId: "krimson",
         isFromCurrentUser: false,

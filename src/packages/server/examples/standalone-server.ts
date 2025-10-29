@@ -34,13 +34,13 @@ const serverOptions: ServerOptions = {
 
 async function createStandaloneServer() {
   try {
-    logger.info('🚀 Creating standalone ElizaOS server...');
+    logger.info(' Creating standalone ElizaOS server...');
 
     // Create server instance
     const server = new AgentServer();
 
     // Initialize with options
-    logger.info('⚙️  Initializing server...');
+    logger.info('  Initializing server...');
     await server.initialize(serverOptions);
 
     // Register custom middleware if needed
@@ -50,11 +50,11 @@ async function createStandaloneServer() {
       next();
     });
 
-    logger.success('✅ Server initialized successfully');
+    logger.success(' Server initialized successfully');
 
     return server;
   } catch (error) {
-    logger.error('❌ Failed to create server:', error);
+    logger.error(' Failed to create server:', error);
     throw error;
   }
 }
@@ -67,11 +67,11 @@ async function startServer() {
     const port = parseInt(process.env.PORT || '3000');
     const host = process.env.HOST || 'localhost';
 
-    logger.info(`🌐 Starting server on ${host}:${port}...`);
+    logger.info(` Starting server on ${host}:${port}...`);
     server.start(port);
 
     // Log available endpoints
-    logger.info('📡 Available endpoints:');
+    logger.info(' Available endpoints:');
     logger.info(`   Dashboard: http://${host}:${port}/`);
     logger.info(`   API: http://${host}:${port}/api/`);
     logger.info(`   Health: http://${host}:${port}/api/health`);
@@ -79,16 +79,16 @@ async function startServer() {
 
     // Graceful shutdown
     const gracefulShutdown = async () => {
-      logger.info('🛑 Graceful shutdown initiated...');
+      logger.info(' Graceful shutdown initiated...');
       await server.stop();
-      logger.success('✅ Server stopped successfully');
+      logger.success(' Server stopped successfully');
       process.exit(0);
     };
 
     process.on('SIGTERM', gracefulShutdown);
     process.on('SIGINT', gracefulShutdown);
   } catch (error) {
-    logger.error('❌ Server startup failed:', error);
+    logger.error(' Server startup failed:', error);
     process.exit(1);
   }
 }
