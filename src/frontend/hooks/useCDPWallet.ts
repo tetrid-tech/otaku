@@ -1,5 +1,5 @@
 import { useIsSignedIn, useSignOut, useIsInitialized, useCurrentUser } from "@coinbase/cdp-hooks";
-import { resolveCdpUserInfo } from "@/lib/cdpUser";
+import { resolveCdpUserInfo, type CdpUser } from "@/lib/cdpUser";
 
 /**
  * Custom hook to access CDP wallet information
@@ -52,7 +52,7 @@ export function useCDPWallet() {
   const isCdpConfigured = Boolean(cdpProjectId);
 
   // Normalize user info using shared helper (DRY)
-  const { email: userEmail, username: userName } = resolveCdpUserInfo(currentUser as any, { isSignedIn });
+  const { email: userEmail, username: userName } = resolveCdpUserInfo(currentUser as CdpUser | undefined, { isSignedIn });
 
   return {
     // Loading state
@@ -65,7 +65,7 @@ export function useCDPWallet() {
     // User info
     userEmail,
     userName,
-    currentUser, // Export currentUser for userId extraction
+    currentUser: currentUser as CdpUser | undefined, // narrowed for consumers
 
     // Actions
     signOut,

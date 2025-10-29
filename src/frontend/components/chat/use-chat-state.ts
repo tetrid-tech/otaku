@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { ChatState, ChatMessage, ChatConversation } from "@/types/chat";
-import { mockChatData } from "@/data/chat-mock";
 
 type ChatComponentState = {
   state: ChatState;
@@ -28,7 +27,7 @@ const chatStore = create<ChatStore>((set, get) => ({
   chatState: {
     state: "collapsed",
   },
-  conversations: mockChatData.conversations,
+  conversations: [],
   newMessage: "",
 
   // Actions
@@ -50,7 +49,7 @@ const chatStore = create<ChatStore>((set, get) => ({
       id: `msg-${Date.now()}`,
       content: newMessage.trim(),
       timestamp: new Date().toISOString(),
-      senderId: mockChatData.currentUser.id,
+      senderId: "current-user",
       isFromCurrentUser: true,
     };
 

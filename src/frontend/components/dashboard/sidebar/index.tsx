@@ -17,11 +17,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import MonkeyIcon from "@/components/icons/monkey"
 import DotsVerticalIcon from "@/components/icons/dots-vertical"
 import { Bullet } from "@/components/ui/bullet"
 import PlusIcon from "@/components/icons/plus"
-import ChatIcon from "@/components/icons/chat"
 import { LogOut } from "lucide-react"
 
 interface Channel {
@@ -150,7 +148,7 @@ export function DashboardSidebar({
           className="flex gap-3 flex-row flex-1 group cursor-pointer hover:opacity-80 transition-opacity"
         >
           <div className="flex overflow-clip size-12 shrink-0 items-center justify-center rounded bg-sidebar-primary-foreground/10 transition-colors group-hover:bg-sidebar-primary text-sidebar-primary-foreground">
-            <MonkeyIcon className="size-10 group-hover:scale-[1.7] origin-top-left transition-transform" />
+            <img src="/avatars/otaku.png" alt="Otaku" className="size-10 group-hover:scale-[1.7] origin-top-left transition-transform" />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="text-2xl font-display">OTAKU</span>
@@ -349,18 +347,6 @@ export function DashboardSidebar({
                   </PopoverTrigger>
                   <PopoverContent className="w-56 p-0" side="bottom" align="end" sideOffset={4}>
                     <div className="flex flex-col">
-                      {onChatClick && (
-                        <button 
-                          onClick={() => {
-                            onChatClick();
-                            setIsPopoverOpen(false);
-                          }}
-                          className="flex items-center px-4 py-2 text-sm hover:bg-accent text-left w-full"
-                        >
-                          <ChatIcon className="mr-2 h-4 w-4" />
-                          Chat
-                        </button>
-                      )}
                       {onAccountClick && (
                         <button 
                           onClick={() => {
@@ -369,7 +355,6 @@ export function DashboardSidebar({
                           }}
                           className="flex items-center px-4 py-2 text-sm hover:bg-accent text-left w-full"
                         >
-                          <MonkeyIcon className="mr-2 h-4 w-4" />
                           Account
                         </button>
                       )}

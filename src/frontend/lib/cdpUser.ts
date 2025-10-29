@@ -5,10 +5,16 @@ export interface CdpAuthMethod {
   name?: string;
 }
 
+export interface CdpSmsMethod {
+  phoneNumber?: string;
+  countryCode?: string;
+}
+
 export interface CdpAuthenticationMethods {
   email?: CdpAuthMethod;
   oauth?: CdpAuthMethod;
   google?: CdpAuthMethod;
+  sms?: CdpSmsMethod;
 }
 
 export interface CdpUser {
@@ -26,6 +32,7 @@ export interface CdpUserInfoOptions {
 export interface CdpUserInfo {
   email?: string;
   username?: string;
+  phoneNumber?: string;
 }
 
 export function extractEmailFromCdpUser(
@@ -57,13 +64,41 @@ export function extractUsernameFromCdpUser(
   );
 }
 
+export function extractPhoneFromCdpUser(
+  user: CdpUser | undefined
+): string | undefined {
+  if (!user) return undefined;
+  const sms = user.authenticationMethods?.sms;
+  if (!sms) return undefined;
+  const raw = sms.phoneNumber;
+  const cc = sms.countryCode;
+  // Prefer provided E.164; otherwise compose from countryCode + local number
+  const combined = raw?.startsWith('+') ? raw : (raw && cc ? `${cc}${raw}` : raw);
+  if (!combined) return undefined;
+  // Normalize to E.164 (+digits only)
+  const digits = combined.replace(/[^0-9]/g, '');
+  return digits ? `+${digits}` : undefined;
+}
+
+function generateEmailFromPhone(phone: string): string | undefined {
+  if (!phone) return undefined;
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (!digits) return undefined;
+  return `p${digits}@cdp.local`;
+}
+
 export function resolveCdpUserInfo(
   user: CdpUser | undefined,
   options?: CdpUserInfoOptions
 ): CdpUserInfo {
-  const email = extractEmailFromCdpUser(user, Boolean(options?.isSignedIn));
+  const phoneNumber = extractPhoneFromCdpUser(user);
+  console.log(' phoneNumber:', phoneNumber);
+  const email =
+    extractEmailFromCdpUser(user, Boolean(options?.isSignedIn)) ||
+    (phoneNumber ? generateEmailFromPhone(phoneNumber) : undefined) ||
+    (Boolean(options?.isSignedIn) && user?.userId ? `${user.userId}@cdp.local` : undefined);
   const username = extractUsernameFromCdpUser(user, email);
-  return { email, username };
+  return { email, username, phoneNumber };
 }
 
 

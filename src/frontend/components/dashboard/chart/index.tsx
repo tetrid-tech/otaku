@@ -10,11 +10,8 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import mockDataJson from "@/mock.json";
 import { Bullet } from "@/components/ui/bullet";
-import type { MockData, TimePeriod } from "@/types/dashboard";
-
-const mockData = mockDataJson as MockData;
+import type { TimePeriod } from "@/types/dashboard";
 
 type ChartDataPoint = {
   date: string;
@@ -200,13 +197,13 @@ export default function DashboardChart() {
         </div>
       </div>
       <TabsContent value="week" className="space-y-4">
-        {renderChart(mockData.chartData.week)}
+        {renderChart([])}
       </TabsContent>
       <TabsContent value="month" className="space-y-4">
-        {renderChart(mockData.chartData.month)}
+        {renderChart([])}
       </TabsContent>
       <TabsContent value="year" className="space-y-4">
-        {renderChart(mockData.chartData.year)}
+        {renderChart([])}
       </TabsContent>
     </Tabs>
   );

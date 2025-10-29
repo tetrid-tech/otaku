@@ -4,16 +4,10 @@ import React, { useState, useEffect, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import TVNoise from "@/components/ui/tv-noise";
-import type { WidgetData } from "@/types/dashboard";
-
-
-interface WidgetProps {
-  widgetData: WidgetData;
-}
 
 // Memoize Widget to prevent re-renders of parent components
 // The clock updates every second internally, but shouldn't trigger parent re-renders
-function Widget({ widgetData }: WidgetProps) {
+function Widget() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userTimezone, setUserTimezone] = useState<string>('');
   const [utcOffset, setUtcOffset] = useState<string>('');
@@ -129,11 +123,11 @@ function Widget({ widgetData }: WidgetProps) {
         </div>
 
         <div className="flex justify-between items-center">
-          <span className="opacity-50">{temperature || widgetData.temperature}</span>
-          <span>{userLocation || widgetData.location}</span>
+          <span className="opacity-50">{temperature || '--°C'}</span>
+          <span>{userLocation || 'Loading...'}</span>
 
           <Badge variant="secondary" className="bg-accent">
-            {utcOffset || widgetData.timezone}
+            {utcOffset || 'UTC'}
           </Badge>
         </div>
 

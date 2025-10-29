@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import DashboardPageLayout from "@/components/dashboard/layout";
 import DashboardCard from "@/components/dashboard/card";
-import MonkeyIcon from "@/components/icons/monkey";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
