@@ -9,6 +9,14 @@ import {
 } from "@elizaos/core";
 import { CoinGeckoService, nativeTokenIds } from "../services/coingecko.service";
 
+// Helper function to format market cap values
+function formatMarketCap(value: number): string {
+  if (value >= 1000000000) return `${(value / 1000000000).toFixed(2)}B`;
+  if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(2)}K`;
+  return value.toFixed(2);
+}
+
 export const getTokenPriceChartAction: Action = {
   name: "GET_TOKEN_PRICE_CHART",
   similes: [
@@ -142,14 +150,26 @@ export const getTokenPriceChartAction: Action = {
         priceChange = { value: change, percentage: changePercent };
       }
 
+      // Calculate market cap change
+      let marketCapChange: { value: number; percentage: number } | null = null;
+      if (chartData.market_cap_data_points && chartData.market_cap_data_points.length > 0) {
+        const firstMC = chartData.market_cap_data_points[0].marketCap;
+        const lastMC = chartData.market_cap_data_points[chartData.market_cap_data_points.length - 1].marketCap;
+        const change = lastMC - firstMC;
+        const changePercent = (change / firstMC) * 100;
+        marketCapChange = { value: change, percentage: changePercent };
+      }
+
       // Create a narrative summary for the agent to format
       const summary = `Price chart data for ${chartData.token_symbol || tokenRaw} over ${timeframe}:
 - Current Price: $${chartData.current_price?.toFixed(6) || 'N/A'}
 - Price Change: ${priceChange ? `${priceChange.value >= 0 ? '+' : ''}$${priceChange.value.toFixed(6)} (${priceChange.percentage >= 0 ? '+' : ''}${priceChange.percentage.toFixed(2)}%)` : 'N/A'}
+- Current Market Cap: ${chartData.current_market_cap ? `$${formatMarketCap(chartData.current_market_cap)}` : 'N/A'}
+- Market Cap Change: ${marketCapChange ? `${marketCapChange.value >= 0 ? '+' : ''}$${formatMarketCap(Math.abs(marketCapChange.value))} (${marketCapChange.percentage >= 0 ? '+' : ''}${marketCapChange.percentage.toFixed(2)}%)` : 'N/A'}
 - Data Points: ${chartData.data_points.length} price points
 - Timeframe: ${chartData.timeframe}
 
-Please analyze this price chart data and provide insights about the token's price movement, trends, and any notable patterns you observe.`;
+Please analyze this price chart data and provide insights about the token's price movement, market cap trends, and any notable patterns you observe.`;
 
       const text = summary;
 
@@ -160,6 +180,7 @@ Please analyze this price chart data and provide insights about the token's pric
           content: {
             ...chartData,
             price_change: priceChange,
+            market_cap_change: marketCapChange,
           } as any,
           source: message.content.source,
         });
@@ -171,10 +192,12 @@ Please analyze this price chart data and provide insights about the token's pric
         data: {
           ...chartData,
           price_change: priceChange,
+          market_cap_change: marketCapChange,
         },
         values: {
           ...chartData,
           price_change: priceChange,
+          market_cap_change: marketCapChange,
         },
         input: inputParams,
       } as ActionResult & { input: typeof inputParams };

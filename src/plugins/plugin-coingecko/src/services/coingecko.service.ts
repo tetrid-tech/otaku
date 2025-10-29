@@ -756,18 +756,28 @@ export class CoinGeckoService extends Service {
 
       const data = (await res.json()) as any;
       const prices = data.prices || [];
+      const marketCaps = data.market_caps || [];
 
       // Filter data based on timeframe
       let filteredPrices = prices;
+      let filteredMarketCaps = marketCaps;
       if (timeframe === '1h') {
         // Last hour - get last 60 data points
         filteredPrices = prices.slice(-60);
+        filteredMarketCaps = marketCaps.slice(-60);
       }
 
-      // Format data points
+      // Format price data points
       const dataPoints = filteredPrices.map(([timestamp, price]: [number, number]) => ({
         timestamp,
         price,
+        date: this.formatDateForTimeframe(timestamp, timeframe),
+      }));
+
+      // Format market cap data points
+      const marketCapDataPoints = filteredMarketCaps.map(([timestamp, marketCap]: [number, number]) => ({
+        timestamp,
+        marketCap,
         date: this.formatDateForTimeframe(timestamp, timeframe),
       }));
 
@@ -776,14 +786,22 @@ export class CoinGeckoService extends Service {
         currentPrice = dataPoints[dataPoints.length - 1].price;
       }
 
+      // Get current market cap
+      const currentMarketCap = marketCapDataPoints.length > 0 
+        ? marketCapDataPoints[marketCapDataPoints.length - 1].marketCap 
+        : null;
+
       return {
         token_identifier: tokenIdentifier,
         token_symbol: tokenSymbol,
         chain: chain,
         timeframe: timeframe,
         current_price: currentPrice,
+        current_market_cap: currentMarketCap,
         data_points: dataPoints,
+        market_cap_data_points: marketCapDataPoints,
         data_points_count: dataPoints.length,
+        market_cap_data_points_count: marketCapDataPoints.length,
       };
     } catch (err) {
       clearTimeout(timeout);
