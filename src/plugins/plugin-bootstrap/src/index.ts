@@ -158,7 +158,8 @@ CRITICAL: Only set isFinish: true when the COMPLETE user request is fulfilled.
   * ONE action (e.g., "send ETH"): Execute  Next step set isFinish: true
   * MULTIPLE actions (e.g., "get price then swap"): Execute all  Then set isFinish: true
 
-Your final output MUST be in this XML format:
+# IMPORTANT
+YOUR FINAL OUTPUT MUST BE IN THIS XML FORMAT:
 
 <output>
 <response>
@@ -222,7 +223,9 @@ Generate a final, user-facing response based on what the assistant accomplished 
 
 **Tone**: Professional, direct, and focused on delivering value. Avoid overly technical jargon unless the user expects it.
 
-Your final output MUST be in this XML format:
+# IMPORTANT
+YOUR FINAL OUTPUT MUST BE IN THIS XML FORMAT:
+
 <output>
 <response>
   <thought>Briefly summarize the user's request and the key results obtained. Note any gaps or issues.</thought>
