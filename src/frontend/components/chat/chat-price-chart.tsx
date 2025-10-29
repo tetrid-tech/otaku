@@ -196,7 +196,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
               accessibilityLayer
               data={data.data_points}
               margin={{
-                left: -12,
+                left: 12,
                 right: 12,
                 top: 12,
                 bottom: 12,
@@ -234,7 +234,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 tickLine={false}
                 tickMargin={12}
                 strokeWidth={1.5}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 8 }}
               />
               <YAxis
                 orientation="right"
@@ -242,7 +242,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 axisLine={false}
                 tickMargin={0}
                 tickCount={6}
-                className="text-xs fill-muted-foreground"
+                className="text-[10px] fill-muted-foreground"
                 tickFormatter={formatYAxisValue}
                 domain={['auto', 'auto']}
               />
@@ -251,7 +251,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 content={
                   <ChartTooltipContent
                     indicator="dot"
-                    className="min-w-[200px] px-4 py-3"
+                    className="min-w-[200px] px-3 py-2 text-xs"
                     labelFormatter={(_, items) => {
                       const first = Array.isArray(items) && items.length > 0 ? (items[0] as any) : undefined;
                       const p = first && typeof first === 'object' ? (first.payload as PriceDataPoint | undefined) : undefined;
@@ -282,7 +282,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
               accessibilityLayer
               data={data.market_cap_data_points}
               margin={{
-                left: -12,
+                left: 12,
                 right: 12,
                 top: 12,
                 bottom: 12,
@@ -320,7 +320,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 tickLine={false}
                 tickMargin={12}
                 strokeWidth={1.5}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 8 }}
               />
               <YAxis
                 orientation="right"
@@ -328,7 +328,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 axisLine={false}
                 tickMargin={0}
                 tickCount={6}
-                className="text-xs fill-muted-foreground"
+                className="text-[10px] fill-muted-foreground"
                 tickFormatter={formatYAxisValue}
                 domain={['auto', 'auto']}
               />
@@ -337,7 +337,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 content={
                   <ChartTooltipContent
                     indicator="dot"
-                    className="min-w-[200px] px-4 py-3"
+                    className="min-w-[200px] px-3 py-2 text-xs"
                     labelFormatter={(_, items) => {
                       const first = Array.isArray(items) && items.length > 0 ? (items[0] as any) : undefined;
                       const p = first && typeof first === 'object' ? (first.payload as MarketCapDataPoint | undefined) : undefined;
