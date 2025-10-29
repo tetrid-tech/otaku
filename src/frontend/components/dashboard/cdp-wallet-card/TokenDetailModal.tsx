@@ -508,7 +508,7 @@ export function TokenDetailModalContent({ token }: TokenDetailModalContentProps)
                   tickCount={6}
                   className="text-sm fill-muted-foreground"
                   tickFormatter={formatYAxisValue}
-                  domain={[0, "dataMax"]}
+                  domain={['auto', 'auto']}
                 />
                 <ChartTooltip
                   cursor={false}
@@ -590,7 +590,7 @@ export function TokenDetailModalContent({ token }: TokenDetailModalContentProps)
                   tickCount={6}
                   className="text-sm fill-muted-foreground"
                   tickFormatter={formatYAxisValue}
-                  domain={[0, "dataMax"]}
+                  domain={['auto', 'auto']}
                 />
                 <ChartTooltip
                   cursor={false}

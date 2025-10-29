@@ -246,7 +246,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 tickCount={6}
                 className="text-xs fill-muted-foreground"
                 tickFormatter={formatYAxisValue}
-                domain={[0, "dataMax"]}
+                domain={['auto', 'auto']}
               />
               <ChartTooltip
                 cursor={false}
@@ -328,7 +328,7 @@ export function ChatPriceChart({ data }: ChatPriceChartProps) {
                 tickCount={6}
                 className="text-xs fill-muted-foreground"
                 tickFormatter={formatYAxisValue}
-                domain={[0, "dataMax"]}
+                domain={['auto', 'auto']}
               />
               <ChartTooltip
                 cursor={false}
