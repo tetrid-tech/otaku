@@ -16,12 +16,8 @@ import { MobileHeader } from './components/dashboard/mobile-header';
 import { LoadingPanelProvider, useLoadingPanel } from './contexts/LoadingPanelContext';
 import { ModalProvider } from './contexts/ModalContext';
 import { MessageSquare, Info } from 'lucide-react';
-import mockDataJson from './mock.json';
-import type { MockData } from './types/dashboard';
 import { resolveCdpUserInfo, type CdpUser } from '@/lib/cdpUser';
 import { UUID } from '@elizaos/core';
-
-const mockData = mockDataJson as MockData;
 
 /**
  * Authenticate with backend and get JWT token
@@ -574,7 +570,6 @@ function App() {
         currentView={currentView}
         userProfile={userProfile}
         totalBalance={totalBalance}
-        mockData={mockData}
         isLoadingChannels={isLoadingChannels}
         walletRef={walletRef}
         handleNewChat={handleNewChat}
@@ -604,7 +599,6 @@ function AppContent({
   currentView,
   userProfile,
   totalBalance,
-  mockData,
   isLoadingChannels,
   walletRef,
   handleNewChat,
@@ -642,7 +636,7 @@ function AppContent({
       )}
       
       {/* Mobile Header */}
-      <MobileHeader mockData={mockData} onHomeClick={() => setCurrentView('chat')} />
+      <MobileHeader onHomeClick={() => setCurrentView('chat')} />
 
       {/* Desktop Layout - 3 columns */}
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-gap lg:px-sides">
@@ -742,7 +736,7 @@ function AppContent({
         {/* Right Sidebar - Widget & CDP Wallet & Notifications */}
         <div className="col-span-3 hidden lg:block">
           <div className="space-y-gap py-sides min-h-screen max-h-screen sticky top-0 overflow-clip">
-            <Widget widgetData={mockData.widgetData} />
+            <Widget />
             {userId && <CDPWalletCard ref={walletRef} userId={userId} walletAddress={userProfile?.walletAddress} onBalanceChange={handleBalanceChange} />}
             <CollapsibleNotifications />
           </div>
