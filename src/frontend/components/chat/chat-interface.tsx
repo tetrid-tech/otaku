@@ -252,6 +252,8 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
 
     const handleNewMessage = (data: any) => {
       console.log(' New message received:', data)
+      console.log(' agentIdRef.current', agentIdRef.current);
+      console.log(' current messages', messages);
       
       const messageId = data.id || crypto.randomUUID()
       const newMessage: Message = {
@@ -290,6 +292,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
       
       // Stop typing indicator only for final summary messages or error messages
       if (newMessage.isAgent) {
+        console.log(' newMessage.isAgent', newMessage.isAgent);
         // Hide dummy tool group when agent message arrives
         setShowDummyToolGroup(false)
         
