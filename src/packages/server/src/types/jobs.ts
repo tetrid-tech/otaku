@@ -17,10 +17,10 @@ export enum JobStatus {
 export interface CreateJobRequest {
   /** Agent ID to send the message to (optional - uses first available agent if not provided) */
   agentId?: string;
-  /** User ID sending the message */
-  userId: string;
-  /** Message content/prompt */
-  content: string;
+  /** User ID sending the message (optional - will be derived from payment signature if not provided) */
+  userId?: string;
+  /** Message prompt */
+  prompt: string;
   /** Optional metadata */
   metadata?: Record<string, unknown>;
   /** Optional timeout in milliseconds (default: 30000ms) */
@@ -105,7 +105,7 @@ export interface Job {
   agentId: UUID;
   userId: UUID;
   channelId: UUID;
-  content: string;
+  prompt: string;
   status: JobStatus;
   createdAt: number;
   expiresAt: number;

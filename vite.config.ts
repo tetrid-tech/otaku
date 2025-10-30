@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: '../../dist/frontend',
       emptyOutDir: true,
-      sourcemap: true,
+      sourcemap: mode === 'development',
     },
     resolve: {
       alias: {

@@ -92,7 +92,6 @@ export function resolveCdpUserInfo(
   options?: CdpUserInfoOptions
 ): CdpUserInfo {
   const phoneNumber = extractPhoneFromCdpUser(user);
-  console.log(' phoneNumber:', phoneNumber);
   const email =
     extractEmailFromCdpUser(user, Boolean(options?.isSignedIn)) ||
     (phoneNumber ? generateEmailFromPhone(phoneNumber) : undefined) ||

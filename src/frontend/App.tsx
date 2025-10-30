@@ -14,10 +14,11 @@ import AccountPage from './components/dashboard/account/page';
 import { SignInModal } from './components/auth/SignInModal';
 import { MobileHeader } from './components/dashboard/mobile-header';
 import { LoadingPanelProvider, useLoadingPanel } from './contexts/LoadingPanelContext';
-import { ModalProvider } from './contexts/ModalContext';
+import { ModalProvider, useModal } from './contexts/ModalContext';
 import { MessageSquare, Info } from 'lucide-react';
 import { resolveCdpUserInfo, type CdpUser } from '@/lib/cdpUser';
 import { UUID } from '@elizaos/core';
+import { AboutModalContent } from '@/components/about/about-modal-content';
 
 /**
  * Authenticate with backend and get JWT token
@@ -67,6 +68,8 @@ interface Channel {
   name: string;
   createdAt?: number;
 }
+
+const ABOUT_MODAL_ID = 'about-otaku-modal';
 
 function App() {
   const { isInitialized, isSignedIn, userEmail, userName, signOut, currentUser } = useCDPWallet();
@@ -611,6 +614,20 @@ function AppContent({
   isSignedIn,
 }: any) {
   const { setOpenMobile } = useSidebar();
+  const { showModal, hideModal } = useModal();
+
+  const handleOpenAbout = () => {
+    showModal(
+      <AboutModalContent onClose={() => hideModal(ABOUT_MODAL_ID)} />,
+      ABOUT_MODAL_ID,
+      {
+        closeOnBackdropClick: true,
+        closeOnEsc: true,
+        showCloseButton: false,
+        className: 'max-w-5xl w-full',
+      }
+    );
+  };
 
   const handleNewChatWithSidebarClose = () => {
     handleNewChat();
@@ -685,14 +702,12 @@ function AppContent({
                   CHAT
                 </h1>
                 <button 
-                  className="ml-auto rounded-full p-2 hover:bg-accent transition-colors"
+                  className="ml-auto rounded-full px-3 py-2 transition-colors hover:bg-accent flex items-center gap-2"
                   title="About"
-                  onClick={() => {
-                    // TODO: Implement about modal/page
-                    console.log('About button clicked');
-                  }}
+                  onClick={handleOpenAbout}
                 >
                   <Info className="size-4 md:size-5 text-muted-foreground" />
+                  <span className="text-sm md:text-base text-muted-foreground uppercase">ABOUT</span>
                 </button>
               </div>
               

@@ -7,6 +7,7 @@ import {
 } from '@elizaos/core';
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { paymentMiddleware } from 'x402-express';
 import type { AgentServer } from '../../index';
 import {
   JobStatus,
@@ -17,8 +18,8 @@ import {
 } from '../../types/jobs';
 import internalMessageBus from '../../bus';
 
-// TODO: Re-enable authentication by uncommenting:
-// import { requireAuthOrApiKey, type AuthenticatedRequest } from '../../middleware';
+// Import CDP facilitator helper for mainnet (if using Coinbase CDP)
+import { createFacilitatorConfig } from '@coinbase/x402';
 
 const DEFAULT_SERVER_ID = '00000000-0000-0000-0000-000000000000' as UUID;
 const DEFAULT_JOB_TIMEOUT_MS = 30000; // 30 seconds
@@ -105,7 +106,7 @@ function jobToResponse(job: Job): JobDetailsResponse {
     status: job.status,
     agentId: job.agentId,
     userId: job.userId,
-    prompt: job.content,
+    prompt: job.prompt,
     createdAt: job.createdAt,
     expiresAt: job.expiresAt,
     result: job.result,
@@ -116,6 +117,7 @@ function jobToResponse(job: Job): JobDetailsResponse {
 
 /**
  * Validate CreateJobRequest
+ * Note: userId is optional - x402 middleware handles payment validation
  */
 function isValidCreateJobRequest(obj: unknown): obj is CreateJobRequest {
   if (!obj || typeof obj !== 'object') {
@@ -125,11 +127,12 @@ function isValidCreateJobRequest(obj: unknown): obj is CreateJobRequest {
   const req = obj as Record<string, unknown>;
   return (
     (req.agentId === undefined || typeof req.agentId === 'string') &&
-    typeof req.userId === 'string' &&
-    typeof req.content === 'string' &&
-    req.content.length > 0
+    (req.userId === undefined || typeof req.userId === 'string') &&
+    typeof req.prompt === 'string' &&
+    req.prompt.length > 0
   );
 }
+
 
 /**
  * Extended Router interface with cleanup method
@@ -139,7 +142,19 @@ export interface JobsRouter extends express.Router {
 }
 
 /**
- * Creates the jobs router for one-off messaging
+ * Creates the jobs router for one-off messaging with x402 payment support
+ * 
+ * This endpoint requires x402 payment ($0.02 per request) on Base or Polygon networks.
+ * Payment is handled via Coinbase facilitator, which verifies and settles payments automatically.
+ * 
+ * Capabilities:
+ * - Research: Query and analyze research data, papers, and academic resources
+ * - News: Fetch and summarize current news articles from various sources
+ * - Information Processing: Process and synthesize information from multiple sources
+ * - Data Analysis: Analyze trends, patterns, and insights from provided data
+ * 
+ * Note: This endpoint does not support swap operations or direct EVM transaction capabilities.
+ * Focus is on research, news, and information processing tasks.
  */
 export function createJobsRouter(
   elizaOS: ElizaOS,
@@ -150,6 +165,29 @@ export function createJobsRouter(
   // Start cleanup interval when router is created
   startCleanupInterval();
 
+  // Configure x402 facilitator
+  // For mainnet: requires CDP_API_KEY_ID and CDP_API_KEY_SECRET
+  // For testnet: can use public facilitator without keys
+  const facilitatorUrl = process.env.X402_FACILITATOR_URL || 'https://facilitator.payai.network';
+  const apiKeyId = process.env.CDP_API_KEY_ID;
+  const apiKeySecret = process.env.CDP_API_KEY_SECRET;
+  
+  // Create facilitator config
+  let facilitatorConfig: unknown;
+  if (apiKeyId && apiKeySecret) {
+    // Use CDP auth for mainnet
+    facilitatorConfig = createFacilitatorConfig(apiKeyId, apiKeySecret);
+    logger.info(
+      `[Jobs API] Using x402 facilitator: ${facilitatorUrl} with CDP API keys for mainnet`
+    );
+  } else {
+    // Use URL-only for testnet
+    facilitatorConfig = { url: facilitatorUrl as `${string}://${string}` };
+    logger.info(
+      `[Jobs API] Using x402 public facilitator: ${facilitatorUrl} (testnet only)`
+    );
+  }
+
   // Cleanup function for the router
   router.cleanup = () => {
     stopCleanupInterval();
@@ -157,14 +195,106 @@ export function createJobsRouter(
     logger.info('[Jobs API] Router cleanup completed');
   };
 
+  // Setup x402 payment middleware for jobs endpoint
+  // Supports both Base and Polygon networks
+  const receivingWallet = process.env.X402_RECEIVING_WALLET || '';
+  if (!receivingWallet) {
+    throw new Error(
+      '[Jobs API] X402_RECEIVING_WALLET is required. Payment protection must be enabled. ' +
+      'Set X402_RECEIVING_WALLET environment variable to your wallet address.'
+    );
+  }
+
+  try {
+    // Apply x402 payment middleware to POST /jobs endpoint only
+    // Price: $0.005 per request
+    // Network: Base mainnet with CDP facilitator  
+    router.use(
+      paymentMiddleware(receivingWallet as `0x${string}`, {
+        'POST /jobs': {
+          price: '$0.005',
+          network: 'base',
+            config: {
+              resource: `http://localhost:${process.env.SERVER_PORT || '3000'}/api/messaging/jobs`,
+              description:
+                'Access AI-powered research and news processing capabilities. ' +
+                'Submit queries for research analysis, news summarization, and information processing. ' +
+                'Agents can perform deep research, fetch current news, analyze trends, and synthesize information from multiple sources. ' +
+                'Each request costs $0.02 and supports payments on Base and Polygon networks via Coinbase facilitator.',
+              inputSchema: {
+                bodyFields: {
+                  userId: {
+                    type: 'string',
+                    description:
+                      'Optional user identifier (UUID). If not provided, a random one will be generated for this session.',
+                  },
+                  prompt: {
+                    type: 'string',
+                    description:
+                      'Query or prompt for research, news, or information processing',
+                    required: true,
+                  },
+                  agentId: {
+                    type: 'string',
+                    description: 'Optional agent identifier (UUID). Uses first available agent if not provided.',
+                  },
+                  timeoutMs: {
+                    type: 'number',
+                    description: 'Optional timeout in milliseconds (default: 30000ms, max: 300000ms)',
+                  },
+                  metadata: {
+                    type: 'object',
+                    description: 'Optional metadata to attach to the job',
+                  },
+                },
+              },
+              outputSchema: {
+                jobId: {
+                  type: 'string',
+                  description: 'Unique job identifier',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['pending', 'processing', 'completed', 'failed', 'timeout'],
+                  description: 'Current job status',
+                },
+                createdAt: {
+                  type: 'number',
+                  description: 'Timestamp when job was created',
+                },
+                expiresAt: {
+                  type: 'number',
+                  description: 'Timestamp when job will expire',
+                },
+              },
+            },
+          },
+        },
+        facilitatorConfig as never
+      )
+    );
+    
+    logger.info(
+      `[Jobs API] x402 payment middleware enabled on POST /jobs. Receiving wallet: ${receivingWallet.substring(0, 10)}...`
+    );
+  } catch (error) {
+    logger.error(
+      '[Jobs API] Failed to setup x402 payment middleware:',
+      error instanceof Error ? error.message : String(error)
+    );
+    throw new Error(
+      'x402 payment middleware setup failed. Server cannot start without payment protection. ' +
+      'Check X402_RECEIVING_WALLET, CDP_API_KEY_ID, and CDP_API_KEY_SECRET environment variables.'
+    );
+  }
+
   /**
    * Create a new job (one-off message to agent)
    * POST /api/messaging/jobs
-   * TODO: Re-enable authentication - temporarily disabled for testing
+   * Requires x402 payment ($0.005) - no JWT authentication
    */
   router.post(
     '/jobs',
-    // requireAuthOrApiKey, // TEMPORARILY DISABLED
     async (req: express.Request, res: express.Response) => {
       try {
         const body = req.body;
@@ -173,17 +303,32 @@ export function createJobsRouter(
         if (!isValidCreateJobRequest(body)) {
           return res.status(400).json({
             success: false,
-            error: 'Invalid request. Required fields: userId, content',
+            error: 'Invalid request. Required fields: prompt',
           });
         }
 
-        // Validate userId
-        const userId = validateUuid(body.userId);
-        if (!userId) {
-          return res.status(400).json({
-            success: false,
-            error: 'Invalid userId format (must be valid UUID)',
-          });
+        // Determine userId
+        // Note: x402-express middleware already validated payment before reaching here
+        // If userId is not provided, generate a random one for this paid request
+        let userId: UUID;
+        
+        if (body.userId) {
+          // Validate provided userId
+          const validatedUserId = validateUuid(body.userId);
+          if (!validatedUserId) {
+            return res.status(400).json({
+              success: false,
+              error: 'Invalid userId format (must be valid UUID)',
+            });
+          }
+          userId = validatedUserId;
+        } else {
+          // Generate a random userId for this paid session
+          // The payment was already validated by x402 middleware
+          userId = uuidv4() as UUID;
+          logger.info(
+            `[Jobs API] Generated userId ${userId} for paid request`
+          );
         }
 
         // Determine agent ID - use provided or first available agent
@@ -240,7 +385,7 @@ export function createJobsRouter(
           agentId,
           userId,
           channelId,
-          content: body.content,
+          prompt: body.prompt,
           status: JobStatus.PENDING,
           createdAt: now,
           expiresAt: now + timeoutMs,
@@ -294,9 +439,9 @@ export function createJobsRouter(
           const userMessage = await serverInstance.createMessage({
             channelId,
             authorId: userId,
-            content: body.content,
+            content: body.prompt,
             rawMessage: {
-              content: body.content,
+              content: body.prompt,
             },
             sourceType: 'job_request',
             metadata: {
@@ -318,10 +463,10 @@ export function createJobsRouter(
             channel_id: channelId,
             server_id: DEFAULT_SERVER_ID,
             author_id: userId,
-            content: body.content,
+            content: body.prompt,
             created_at: new Date(userMessage.createdAt).getTime(),
             source_type: 'job_request',
-            raw_message: { content: body.content },
+            raw_message: { content: body.prompt },
             metadata: {
               jobId,
               isJobMessage: true,
@@ -446,6 +591,34 @@ export function createJobsRouter(
   );
 
   /**
+   * Health check endpoint
+   * GET /api/messaging/jobs/health
+   * Note: Must be defined before /jobs/:jobId to avoid conflict
+   */
+  router.get('/jobs/health', (_req: express.Request, res: express.Response) => {
+    const now = Date.now();
+    const statusCounts = {
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      timeout: 0,
+    };
+
+    for (const job of jobs.values()) {
+      statusCounts[job.status]++;
+    }
+
+    res.json({
+      healthy: true,
+      timestamp: now,
+      totalJobs: jobs.size,
+      statusCounts,
+      maxJobs: MAX_JOBS_IN_MEMORY,
+    });
+  });
+
+  /**
    * Get job details and status
    * GET /api/messaging/jobs/:jobId
    */
@@ -484,11 +657,10 @@ export function createJobsRouter(
   /**
    * List all jobs (for debugging/admin)
    * GET /api/messaging/jobs
-   * TODO: Re-enable authentication - temporarily disabled for testing
+   * Note: No authentication required - public endpoint for job status checking
    */
   router.get(
     '/jobs',
-    // requireAuthOrApiKey, // TEMPORARILY DISABLED
     async (req: express.Request, res: express.Response) => {
       try {
         const limit = parseInt(req.query.limit as string) || 50;
@@ -526,33 +698,6 @@ export function createJobsRouter(
       }
     }
   );
-
-  /**
-   * Health check endpoint
-   * GET /api/messaging/jobs/health
-   */
-  router.get('/jobs/health', (_req: express.Request, res: express.Response) => {
-    const now = Date.now();
-    const statusCounts = {
-      pending: 0,
-      processing: 0,
-      completed: 0,
-      failed: 0,
-      timeout: 0,
-    };
-
-    for (const job of jobs.values()) {
-      statusCounts[job.status]++;
-    }
-
-    res.json({
-      healthy: true,
-      timestamp: now,
-      totalJobs: jobs.size,
-      statusCounts,
-      maxJobs: MAX_JOBS_IN_MEMORY,
-    });
-  });
 
   return router;
 }

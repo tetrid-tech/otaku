@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useIsSignedIn, useSignOut, useIsInitialized, useCurrentUser } from "@coinbase/cdp-hooks";
 import { resolveCdpUserInfo, type CdpUser } from "@/lib/cdpUser";
 
@@ -51,8 +52,11 @@ export function useCDPWallet() {
   const cdpProjectId = import.meta.env.VITE_CDP_PROJECT_ID;
   const isCdpConfigured = Boolean(cdpProjectId);
 
-  // Normalize user info using shared helper (DRY)
-  const { email: userEmail, username: userName } = resolveCdpUserInfo(currentUser as CdpUser | undefined, { isSignedIn });
+  // Normalize user info using shared helper (DRY) - memoized to prevent excessive re-renders
+  const { email: userEmail, username: userName } = useMemo(
+    () => resolveCdpUserInfo(currentUser as CdpUser | undefined, { isSignedIn }),
+    [currentUser, isSignedIn]
+  );
 
   return {
     // Loading state
