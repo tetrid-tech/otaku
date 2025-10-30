@@ -3,19 +3,22 @@
  * 
  * This script demonstrates how to:
  * 1. Test the 402 Payment Required response
- * 2. Make a paid request using x402-fetch
+ * 2. Make a paid request using x402-fetch (working implementation)
  * 3. Poll for job completion
  * 4. Retrieve job results
  * 
  * Prerequisites:
  * - Server running with X402_RECEIVING_WALLET configured
- * - CDP_API_KEY_ID and CDP_API_KEY_SECRET environment variables (for mainnet facilitator)
  * - For Test 2 (paid requests):
  *   - Wallet with USDC on Base mainnet (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)
  *   - EVM_PRIVATE_KEY, TEST_WALLET_PRIVATE_KEY, or CDP_API_KEY_PRIVATE_KEY environment variable
  * 
- * Note: This script tests BASE MAINNET payments. You need real USDC on Base to execute paid requests.
- * For testing without real funds, you can skip Test 2 by not setting a private key.
+ * IMPORTANT NOTES:
+ * - This script uses x402-fetch, NOT x402-axios
+ * - x402-axios does NOT work (withPaymentInterceptor fails to send X-PAYMENT header)
+ * - x402-fetch is the proven working implementation (used in plugin-cdp)
+ * - This tests BASE MAINNET payments - you need real USDC on Base
+ * - For testing without real funds, skip Test 2 by not setting a private key
  * 
  * Usage:
  *   bun run scripts/test-x402-jobs.ts
@@ -24,8 +27,7 @@
 import { createWalletClient, createPublicClient, http, type Address } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import axios from 'axios';
-import { withPaymentInterceptor } from 'x402-axios';
+import { wrapFetchWithPayment, decodeXPaymentResponse } from 'x402-fetch';
 
 // Configuration
 const API_BASE_URL = process.env.API_URL || 'http://localhost:3000';
@@ -227,21 +229,29 @@ async function testPaidRequest(prompt: string): Promise<void> {
       }
     }
 
-    // Wrap axios with payment capability (allow 402 responses)
-    const axiosClient = axios.create({
-      validateStatus: (status) => status < 500, // Don't throw on 402
-    });
-    const axiosWithPayment = withPaymentInterceptor(
-      axiosClient,
-      walletClient as never
+    // Wrap fetch with x402 payment capability (same as working implementation in plugin-cdp)
+    // Convert max payment from USDC to base units (USDC has 6 decimals)
+    const maxPaymentInBaseUnits = BigInt(Math.floor(MAX_PAYMENT_USDC * 1_000_000));
+    
+    console.log(`Setting up x402-fetch with payment capability (max: ${MAX_PAYMENT_USDC} USDC)...\n`);
+    const fetchWithPayment = wrapFetchWithPayment(
+      fetch,
+      walletClient as never,
+      maxPaymentInBaseUnits
     );
 
-    console.log(`\nSending request to: ${JOBS_ENDPOINT}`);
+    console.log(`Sending request to: ${JOBS_ENDPOINT}`);
     console.log(`Prompt: "${prompt}"\n`);
 
     // Make paid request
-    console.log('💳 Attempting payment with x402-axios...');
-    const response = await axiosWithPayment.post(JOBS_ENDPOINT, { prompt });
+    console.log('💳 Making request with x402-fetch (will pay if required)...');
+    const response = await fetchWithPayment(JOBS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
+    });
     
     if (response.status === 201) {
       console.log('✅ Payment and job creation successful!');
@@ -254,32 +264,31 @@ async function testPaidRequest(prompt: string): Promise<void> {
     console.log(`Status: ${response.status} ${response.statusText}`);
     
     // Check for payment response header and extract transaction hash
-    const paymentResponseHeader = response.headers['x-payment-response'];
+    const paymentResponseHeader = response.headers.get('x-payment-response');
     let transactionHash: string | null = null;
+    let paymentInfo: { success: boolean; transaction: string; network: string; payer: string } | null = null;
     
     if (paymentResponseHeader) {
       console.log('\n💳 Payment response received!');
       try {
-        const paymentData = JSON.parse(
-          Buffer.from(paymentResponseHeader, 'base64').toString('utf-8')
-        );
-        console.log('Payment data:', JSON.stringify(paymentData, null, 2));
+        paymentInfo = decodeXPaymentResponse(paymentResponseHeader);
+        console.log('Payment data:', JSON.stringify(paymentInfo, null, 2));
         
-        if (paymentData.transaction) {
-          transactionHash = paymentData.transaction;
+        if (paymentInfo.transaction) {
+          transactionHash = paymentInfo.transaction;
           console.log(`\n🔗 Transaction Hash: ${transactionHash}`);
           console.log(`   View on BaseScan: https://basescan.org/tx/${transactionHash}`);
         }
         
-        if (paymentData.payer) {
-          console.log(`   Payer: ${paymentData.payer}`);
+        if (paymentInfo.payer) {
+          console.log(`   Payer: ${paymentInfo.payer}`);
         }
         
-        if (paymentData.network) {
-          console.log(`   Network: ${paymentData.network}`);
+        if (paymentInfo.network) {
+          console.log(`   Network: ${paymentInfo.network}`);
         }
       } catch (error) {
-        console.error('Failed to parse payment response:', error);
+        console.error('Failed to parse payment response:', error instanceof Error ? error.message : String(error));
       }
     }
     
@@ -311,7 +320,7 @@ async function testPaidRequest(prompt: string): Promise<void> {
     }
 
     if (response.status === 201) {
-      const job: JobResponse = response.data;
+      const job: JobResponse = await response.json();
       console.log('✅ Job created successfully!\n');
       console.log(`Job ID: ${job.jobId}`);
       console.log(`Status: ${job.status}`);
@@ -321,7 +330,7 @@ async function testPaidRequest(prompt: string): Promise<void> {
       // Poll for completion
       await pollForCompletion(job.jobId);
     } else {
-      const errorText = JSON.stringify(response.data);
+      const errorText = await response.text();
       console.error(`❌ Unexpected response (${response.status}):`, errorText);
       
       // If payment failed due to insufficient balance or other issues

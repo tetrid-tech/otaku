@@ -1,6 +1,7 @@
 import {
   logger,
   validateUuid,
+  stringToUuid,
   type UUID,
   type ElizaOS,
   ChannelType,
@@ -307,13 +308,45 @@ export function createJobsRouter(
           });
         }
 
-        // Determine userId
-        // Note: x402-express middleware already validated payment before reaching here
-        // If userId is not provided, generate a random one for this paid request
+        // Determine userId based on wallet address from payment
+        // The x402-express middleware validates payment and adds payment info to headers
         let userId: UUID;
         
-        if (body.userId) {
-          // Validate provided userId
+        // Extract payer wallet address from x-payment-response header
+        // Format: base64-encoded JSON with { payer, transaction, network, success }
+        // Example: { "payer": "0x123...", "transaction": "0xabc...", "network": "base", "success": true }
+        const paymentResponseHeader = req.headers['x-payment-response'] as string | undefined;
+        
+        if (paymentResponseHeader) {
+          try {
+            // Decode the base64-encoded payment response
+            const paymentData = JSON.parse(
+              Buffer.from(paymentResponseHeader, 'base64').toString('utf-8')
+            );
+            
+            if (paymentData.payer) {
+              // Create deterministic UUID from wallet address
+              // This ensures the same wallet always gets the same entity ID
+              userId = stringToUuid(paymentData.payer.toLowerCase()) as UUID;
+              logger.info(
+                `[Jobs API] Created entity ID from wallet address: ${paymentData.payer} -> ${userId}`
+              );
+            } else {
+              // Fallback: use provided userId or generate random one
+              userId = body.userId ? validateUuid(body.userId) || (uuidv4() as UUID) : (uuidv4() as UUID);
+              logger.warn(
+                `[Jobs API] No payer in payment response, using fallback userId: ${userId}`
+              );
+            }
+          } catch (error) {
+            logger.error(
+              `[Jobs API] Failed to parse payment response header: ${error instanceof Error ? error.message : String(error)}`
+            );
+            // Fallback: use provided userId or generate random one
+            userId = body.userId ? validateUuid(body.userId) || (uuidv4() as UUID) : (uuidv4() as UUID);
+          }
+        } else if (body.userId) {
+          // Validate provided userId (though this shouldn't happen with payment middleware)
           const validatedUserId = validateUuid(body.userId);
           if (!validatedUserId) {
             return res.status(400).json({
@@ -323,12 +356,11 @@ export function createJobsRouter(
           }
           userId = validatedUserId;
         } else {
-          // Generate a random userId for this paid session
-          // The payment was already validated by x402 middleware
-          userId = uuidv4() as UUID;
-          logger.info(
-            `[Jobs API] Generated userId ${userId} for paid request`
+          // No payment header and no userId - this shouldn't happen with middleware
+          logger.warn(
+            '[Jobs API] No payment response header and no userId provided - generating random ID'
           );
+          userId = uuidv4() as UUID;
         }
 
         // Determine agent ID - use provided or first available agent
