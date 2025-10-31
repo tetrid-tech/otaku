@@ -154,7 +154,7 @@ const pluginItems: PluginItem[] = [
 
 export function AboutModalContent({ onClose }: AboutModalContentProps) {
   return (
-    <div className="flex h-[80vh] max-h-[700px] flex-col text-foreground">
+    <div className="relative flex h-[80vh] max-h-[700px] flex-col text-foreground">
       {/* Fixed Header */}
       <header className="flex shrink-0 flex-col gap-6 border-b border-border/60 pb-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-4">
@@ -195,7 +195,7 @@ export function AboutModalContent({ onClose }: AboutModalContentProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="self-end text-muted-foreground hover:text-foreground"
+          className="absolute right-3 top-3 z-10 text-muted-foreground hover:text-foreground"
           onClick={onClose}
           aria-label="Close about modal"
         >
