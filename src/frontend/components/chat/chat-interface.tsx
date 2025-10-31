@@ -834,7 +834,7 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                 {/* Show plugins or plugin-specific prompts */}
                 {!selectedPlugin ? (
                   // Plugin Grid
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
                     {(Object.keys(PLUGIN_ACTIONS) as Array<keyof typeof PLUGIN_ACTIONS>).map((pluginKey) => {
                       const plugin = PLUGIN_ACTIONS[pluginKey]
                       const Icon = plugin.icon
@@ -842,25 +842,25 @@ export function ChatInterface({ agent, userId, serverId, channelId, isNewChatMod
                         <button
                           key={pluginKey}
                           onClick={() => setSelectedPlugin(pluginKey)}
-                          className="flex flex-col gap-3 p-4 bg-card/80 hover:bg-card rounded-xl border border-border/40 transition-all group hover:border-primary/40 text-left"
+                          className="flex flex-col gap-2 md:gap-3 p-3 md:p-4 bg-card/80 hover:bg-card rounded-lg md:rounded-xl border border-border/40 transition-all group hover:border-primary/40 text-left"
                         >
-                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                            <Icon className="size-3.5 text-primary shrink-0" strokeWidth={2} />
+                          <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                            <Icon className="size-3 md:size-3.5 text-primary shrink-0" strokeWidth={2} />
                             <span className="text-foreground">{plugin.name}</span>
                           </div>
-                          <p className="text-sm text-muted-foreground/80 leading-relaxed">{plugin.description}</p>
+                          <p className="text-[11px] md:text-sm text-muted-foreground/80 leading-snug md:leading-relaxed">{plugin.description}</p>
                         </button>
                       )
                     })}
                   </div>
                 ) : (
                   // Plugin-specific prompts
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1.5 md:gap-2">
                     {PLUGIN_ACTIONS[selectedPlugin].prompts.map((prompt, index) => (
                       <button
                         key={index}
                         onClick={() => handlePromptClick(prompt)}
-                        className="px-3 py-2 text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left"
+                        className="px-2.5 md:px-3 py-2 text-xs md:text-sm bg-accent hover:bg-accent/80 text-foreground rounded border border-border transition-colors text-left"
                       >
                         {prompt}
                       </button>
