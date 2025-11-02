@@ -244,6 +244,56 @@ export class DefiLlamaService extends Service {
   }
 
   /**
+   * Search for multiple protocol candidates matching a query (0-5 matches)
+   * Returns protocols sorted by relevance and TVL
+   */
+  async searchProtocolCandidates(query: string, maxResults: number = 5): Promise<ProtocolSummary[]> {
+    await this.ensureFresh();
+    const q = (query || "").trim();
+    if (!q) {
+      return [];
+    }
+
+    const qLower = q.toLowerCase();
+    const candidates: Array<{ protocol: DefiLlamaProtocol; score: number }> = [];
+
+    for (const protocol of this.cache) {
+      const name = (protocol.name || "").toLowerCase();
+      const symbol = (protocol.symbol || "").toLowerCase();
+      const slug = typeof protocol.slug === "string" ? protocol.slug.toLowerCase() : "";
+
+      let score = 0;
+
+      // Exact matches get highest priority
+      if (name === qLower || symbol === qLower || slug === qLower) {
+        score = 1000;
+      }
+      // Starts with query
+      else if (name.startsWith(qLower) || symbol.startsWith(qLower) || slug.startsWith(qLower)) {
+        score = 500;
+      }
+      // Contains query
+      else if (name.includes(qLower) || symbol.includes(qLower) || slug.includes(qLower)) {
+        score = 100;
+      }
+
+      if (score > 0) {
+        // Boost score by TVL (protocols with higher TVL ranked higher among same match type)
+        const tvlBoost = protocol.tvl ? Math.log10(protocol.tvl + 1) : 0;
+        candidates.push({ protocol, score: score + tvlBoost });
+      }
+    }
+
+    // Sort by score descending
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Take top N results
+    const topCandidates = candidates.slice(0, maxResults);
+
+    return topCandidates.map((c) => shapeProtocol(c.protocol));
+  }
+
+  /**
    * Search for yield opportunities by protocol, token, and/or chain
    */
   async searchYields(params: {
