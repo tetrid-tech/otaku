@@ -885,7 +885,7 @@ export const CDPWalletCard = forwardRef<CDPWalletCardRef, CDPWalletCardProps>(
                     const txs = groupedTransactions[date];
                     return (
                       <div key={date}>
-                        <div className="sticky top-0 bg-background/95 backdrop-blur-sm text-[10px] font-mono text-muted-foreground mb-1.5 uppercase tracking-wider border-b border-border/50 pb-1">
+                        <div className="sticky top-0 bg-background/95  text-[10px] font-mono text-muted-foreground mb-1.5 uppercase tracking-wider border-b border-border/50 pb-1">
                           {date}
                         </div>
                         <div className="space-y-1">
