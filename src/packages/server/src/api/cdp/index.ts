@@ -3,8 +3,8 @@ import { logger } from '@elizaos/core';
 import type { AgentServer } from '../../index';
 import { sendError, sendSuccess } from '../shared/response-utils';
 import { requireAuth, type AuthenticatedRequest } from '../../middleware';
-import { CdpTransactionManager } from '../../utils/cdp-transaction-manager';
-import { MAINNET_NETWORKS } from '../../constants/chains';
+import { CdpTransactionManager } from '../../../../../managers/cdp-transaction-manager';
+import { MAINNET_NETWORKS } from '../../../../../constants/chains';
 
 export function cdpRouter(_serverInstance: AgentServer): express.Router {
   const router = express.Router();
@@ -23,7 +23,7 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
   router.post('/wallet', async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      
+
       const result = await cdpTransactionManager.getOrCreateWallet(userId);
       
       sendSuccess(res, result);
@@ -339,9 +339,9 @@ export function cdpRouter(_serverInstance: AgentServer): express.Router {
 
       const result = await cdpTransactionManager.swap({
         userId,
-        network,
-        fromToken,
-        toToken,
+            network,
+            fromToken,
+            toToken,
         fromAmount,
         slippageBps,
       });

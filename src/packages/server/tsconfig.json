@@ -9,7 +9,7 @@
     "target": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "rootDir": "src",
+    "rootDir": "../..",
     "moduleResolution": "bundler",
     "outDir": "./dist",
     "skipLibCheck": true,
@@ -23,6 +23,6 @@
     "noUnusedParameters": true,
     "allowUnusedLabels": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../../**/*.ts", "../../**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }
