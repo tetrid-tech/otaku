@@ -113,6 +113,7 @@ export class CdpTransactionManager {
   private cdpClient: CdpClient | null = null;
   private tokensCache = new Map<string, CacheEntry<any>>();
   private nftsCache = new Map<string, CacheEntry<any>>();
+  private iconCache = new Map<string, string | null>(); // Global icon cache: contractAddress -> iconUrl (null = no icon)
   private readonly CACHE_TTL = 300 * 1000; // 5 minutes
 
   // Private constructor to prevent direct instantiation
@@ -165,6 +166,69 @@ export class CdpTransactionManager {
       throw new Error('CDP client not initialized. Check environment variables.');
     }
     return this.cdpClient;
+  }
+
+  // ============================================================================
+  // Icon Cache Helpers
+  // ============================================================================
+
+  /**
+   * Get icon from global cache by contract address
+   * Returns undefined if not in cache, null if cached as "no icon"
+   */
+  private getIconFromCache(contractAddress: string | null | undefined): string | null | undefined {
+    if (!contractAddress) {
+      return null;
+    }
+    const key = contractAddress.toLowerCase();
+    if (!this.iconCache.has(key)) {
+      return undefined; // Not in cache yet
+    }
+    return this.iconCache.get(key) || null; // Return cached value (could be null)
+  }
+
+  /**
+   * Set icon in global cache by contract address
+   * Accepts null to mark "no icon available" and prevent refetching
+   */
+  private setIconInCache(contractAddress: string | null | undefined, icon: string | null | undefined): void {
+    if (!contractAddress) {
+      return;
+    }
+    // Store even if icon is null/undefined to prevent refetching
+    this.iconCache.set(contractAddress.toLowerCase(), icon || null);
+  }
+
+  /**
+   * Get icon for a contract address (check cache, then fetch if needed)
+   */
+  private async getOrFetchIcon(contractAddress: string, chain: string): Promise<string | null> {
+    // Check cache first
+    const cached = this.getIconFromCache(contractAddress);
+    if (cached !== undefined) {
+      // Found in cache (could be null or a URL)
+      return cached;
+    }
+
+    // Not in cache - fetch token info to get icon
+    const chainConfig = getChainConfig(chain);
+    if (!chainConfig) {
+      // Cache null to prevent future attempts
+      this.setIconInCache(contractAddress, null);
+      return null;
+    }
+
+    try {
+      const tokenInfo = await this.getTokenInfo(contractAddress, chainConfig.coingeckoPlatform);
+      // Cache the result (even if null)
+      this.setIconInCache(contractAddress, tokenInfo?.icon || null);
+      return tokenInfo?.icon || null;
+    } catch (error) {
+      logger.debug(`[CdpTransactionManager] Failed to fetch icon for ${contractAddress}:`, error instanceof Error ? error.message : String(error));
+      // Cache null to prevent retries
+      this.setIconInCache(contractAddress, null);
+      return null;
+    }
   }
 
   // ============================================================================
@@ -386,6 +450,9 @@ export class CdpTransactionManager {
             // Use token info price, fallback to 0 if null
             usdPrice = tokenInfo.price || 0;
             
+            // Populate icon cache
+            this.setIconInCache(contractAddress, tokenInfo.icon);
+            
             // Convert balance using correct decimals
             const amountNum = this.safeBalanceToNumber(tokenBalanceHex, tokenInfo.decimals || 18);
             const usdValue = amountNum * usdPrice;
@@ -558,6 +625,9 @@ export class CdpTransactionManager {
           if (imageUrl && imageUrl.startsWith('ipfs://')) {
             imageUrl = imageUrl.replace('ipfs://', 'https://ipfs.io/ipfs/');
           }
+
+          // Populate icon cache with NFT image (for NFT contract addresses)
+          this.setIconInCache(contractAddress, imageUrl);
   
           allNfts.push({
             chain: network.name,
@@ -625,49 +695,6 @@ export class CdpTransactionManager {
     
     // Last resort: use current time
     return Date.now();
-  }
-
-  /**
-   * Helper: Find token/NFT icon from cache
-   * Looks up contract address in tokensCache and nftsCache
-   */
-  private getTokenIconFromCache(contractAddress: string | null | undefined, chain: string, userId: string): string | null {
-    if (!contractAddress) {
-      return null;
-    }
-
-    // Normalize address to lowercase for comparison
-    const normalizedAddress = contractAddress.toLowerCase();
-
-    // Check tokensCache (per-chain and aggregate)
-    const cacheKeys = [`${userId}:${chain}`, userId];
-    
-    for (const cacheKey of cacheKeys) {
-      const cached = this.tokensCache.get(cacheKey);
-      if (cached) {
-        const token = cached.data.tokens?.find((t: any) => 
-          t.contractAddress?.toLowerCase() === normalizedAddress
-        );
-        if (token?.icon) {
-          return token.icon;
-        }
-      }
-    }
-
-    // Check nftsCache
-    for (const cacheKey of cacheKeys) {
-      const cached = this.nftsCache.get(cacheKey);
-      if (cached) {
-        const nft = cached.data.nfts?.find((n: any) => 
-          n.contractAddress?.toLowerCase() === normalizedAddress
-        );
-        if (nft?.image) {
-          return nft.image;
-        }
-      }
-    }
-
-    return null;
   }
 
   async getTransactionHistory(userId: string): Promise<{
@@ -742,7 +769,11 @@ export class CdpTransactionManager {
             for (const tx of sentTransfers) {
               const timestamp = await this.getTransactionTimestamp(tx, network.rpc);
               const contractAddress = tx.rawContract?.address || null;
-              const icon = this.getTokenIconFromCache(contractAddress, network.name, userId);
+              
+              // Get icon from global cache or fetch if not found
+              const icon = contractAddress 
+                ? await this.getOrFetchIcon(contractAddress, network.name)
+                : null;
               
               allTransactions.push({
                 chain: network.name,
@@ -770,7 +801,11 @@ export class CdpTransactionManager {
             for (const tx of receivedTransfers) {
               const timestamp = await this.getTransactionTimestamp(tx, network.rpc);
               const contractAddress = tx.rawContract?.address || null;
-              const icon = this.getTokenIconFromCache(contractAddress, network.name, userId);
+              
+              // Get icon from global cache or fetch if not found
+              const icon = contractAddress 
+                ? await this.getOrFetchIcon(contractAddress, network.name)
+                : null;
               
               allTransactions.push({
                 chain: network.name,
