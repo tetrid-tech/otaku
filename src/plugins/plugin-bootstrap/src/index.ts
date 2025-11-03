@@ -56,57 +56,6 @@ interface MultiStepActionResult {
 const latestResponseIds = new Map<string, Map<string, string>>();
 
 /**
- * Determines whether to skip the shouldRespond logic based on room type and message source.
- * Supports both default values and runtime-configurable overrides via env settings.
- */
-export function shouldBypassShouldRespond(
-  runtime: IAgentRuntime,
-  room?: Room,
-  source?: string
-): boolean {
-  if (!room) return false;
-
-  function normalizeEnvList(value: unknown): string[] {
-    if (!value || typeof value !== 'string') return [];
-
-    const cleaned = value.trim().replace(/^\[|\]$/g, '');
-    return cleaned
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
-
-  const defaultBypassTypes = [
-    ChannelType.DM,
-    ChannelType.VOICE_DM,
-    ChannelType.SELF,
-    ChannelType.API,
-  ];
-
-  const defaultBypassSources = ['client_chat'];
-
-  const bypassTypesSetting = normalizeEnvList(runtime.getSetting('SHOULD_RESPOND_BYPASS_TYPES'));
-  const bypassSourcesSetting = normalizeEnvList(
-    runtime.getSetting('SHOULD_RESPOND_BYPASS_SOURCES')
-  );
-
-  const bypassTypes = new Set(
-    [...defaultBypassTypes.map((t) => t.toString()), ...bypassTypesSetting].map((s: string) =>
-      s.trim().toLowerCase()
-    )
-  );
-
-  const bypassSources = [...defaultBypassSources, ...bypassSourcesSetting].map((s: string) =>
-    s.trim().toLowerCase()
-  );
-
-  const roomType = room.type?.toString().toLowerCase();
-  const sourceStr = source?.toLowerCase() || '';
-
-  return bypassTypes.has(roomType) || bypassSources.some((pattern) => sourceStr.includes(pattern));
-}
-
-/**
  * Handles incoming messages and generates responses based on the provided runtime and message information.
  *
  * @param {MessagePayload} payload - The message payload containing runtime, message, and callback.
@@ -294,154 +243,69 @@ const messageReceivedHandler = async ({
           true
         );
 
-        let shouldRespond = true;
-
-        // I don't think we need these right now
-        //runtime.logger.debug('shouldRespond is', shouldRespond);
-        //runtime.logger.debug('shouldSkipShouldRespond', shouldSkipShouldRespond);
-
+      
         let responseContent: Content | null = null;
         let responseMessages: Memory[] = [];
 
-        if (shouldRespond) {
-          const result = useMultiStep
-            ? await runMultiStepCore({ runtime, message, state, callback })
-            : await runSingleShotCore({ runtime, message, state });
+       
+        const result = useMultiStep
+          ? await runMultiStepCore({ runtime, message, state, callback })
+          : await runSingleShotCore({ runtime, message, state });
 
-          responseContent = result.responseContent;
-          responseMessages = result.responseMessages;
-          state = result.state;
+        responseContent = result.responseContent;
+        responseMessages = result.responseMessages;
+        state = result.state;
 
-          // Race check before we send anything
-          // IMPORTANT: Bypass race check for job requests (x402 paid API)
-          // Job requests are one-off operations that must always complete
-          const isJobRequest = (message.content.metadata as Record<string, unknown>)?.isJobMessage === true;
-          
-          if (!isJobRequest) {
-            const currentResponseId = agentResponses.get(message.roomId);
-            if (currentResponseId !== responseId) {
-              runtime.logger.info(
-                `Response discarded - newer message being processed for agent: ${runtime.agentId}, room: ${message.roomId}`
-              );
-              return;
-            }
-          }
-
-          if (responseContent && message.id) {
-            responseContent.inReplyTo = createUniqueUuid(runtime, message.id);
-          }
-
-          if (responseContent?.providers?.length && responseContent.providers.length > 0) {
-            state = await runtime.composeState(message, responseContent.providers || []);
-          }
-
-          if (responseContent) {
-            const mode = result.mode ?? ('actions' as StrategyMode);
-
-            if (mode === 'simple') {
-              // Log provider usage for simple responses
-              if (responseContent.providers && responseContent.providers.length > 0) {
-                runtime.logger.debug(
-                  { providers: responseContent.providers },
-                  '[Bootstrap] Simple response used providers'
-                );
-              }
-              // without actions there can't be more than one message
-              if (callback) {
-                await callback(responseContent);
-              }
-            } else if (mode === 'actions') {
-              await runtime.processActions(message, responseMessages, state, async (content) => {
-                runtime.logger.debug({ content }, 'action callback');
-                responseContent!.actionCallbacks = content;
-                if (callback) {
-                  return callback(content);
-                }
-                return [];
-              });
-            }
-          }
-        } else {
-          // Handle the case where the agent decided not to respond
-          runtime.logger.debug(
-            '[Bootstrap] Agent decided not to respond (shouldRespond is false).'
-          );
-
-          // Check if we still have the latest response ID
+        // Race check before we send anything
+        // IMPORTANT: Bypass race check for job requests (x402 paid API)
+        // Job requests are one-off operations that must always complete
+        const isJobRequest = (message.content.metadata as Record<string, unknown>)?.isJobMessage === true;
+        
+        if (!isJobRequest) {
           const currentResponseId = agentResponses.get(message.roomId);
-          // helpful for swarms
-          const keepResp = parseBooleanFromText(runtime.getSetting('BOOTSTRAP_KEEP_RESP'));
-          if (currentResponseId !== responseId && !keepResp) {
+          if (currentResponseId !== responseId) {
             runtime.logger.info(
-              `Ignore response discarded - newer message being processed for agent: ${runtime.agentId}, room: ${message.roomId}`
+              `Response discarded - newer message being processed for agent: ${runtime.agentId}, room: ${message.roomId}`
             );
-            // Emit run ended event on successful completion
-            await runtime.emitEvent(EventType.RUN_ENDED, {
-              runtime,
-              runId,
-              messageId: message.id,
-              roomId: message.roomId,
-              entityId: message.entityId,
-              startTime,
-              status: 'replaced',
-              endTime: Date.now(),
-              duration: Date.now() - startTime,
-              source: 'messageHandler',
-            });
-            return; // Stop processing if a newer message took over
-          }
-
-          if (!message.id) {
-            runtime.logger.error(
-              '[Bootstrap] Message ID is missing, cannot create ignore response.'
-            );
-            // Emit run ended event on successful completion
-            await runtime.emitEvent(EventType.RUN_ENDED, {
-              runtime,
-              runId,
-              messageId: message.id,
-              roomId: message.roomId,
-              entityId: message.entityId,
-              startTime,
-              status: 'noMessageId',
-              endTime: Date.now(),
-              duration: Date.now() - startTime,
-              source: 'messageHandler',
-            });
             return;
           }
-
-          // Construct a minimal content object indicating ignore, include a generic thought
-          const ignoreContent: Content = {
-            thought: 'Agent decided not to respond to this message.',
-            actions: ['IGNORE'],
-            simple: true, // Treat it as simple for callback purposes
-            inReplyTo: createUniqueUuid(runtime, message.id), // Reference original message
-          };
-
-          // Call the callback directly with the ignore content
-          if (callback) {
-            await callback(ignoreContent);
-          }
-
-          // Also save this ignore action/thought to memory
-          const ignoreMemory: Memory = {
-            id: asUUID(v4()),
-            entityId: runtime.agentId,
-            agentId: runtime.agentId,
-            content: ignoreContent,
-            roomId: message.roomId,
-            createdAt: Date.now(),
-          };
-          await runtime.createMemory(ignoreMemory, 'messages');
-          runtime.logger.debug(
-            '[Bootstrap] Saved ignore response to memory',
-            `memoryId: ${ignoreMemory.id}`
-          );
-
-          // Optionally, evaluate the decision to ignore (if relevant evaluators exist)
-          // await runtime.evaluate(message, state, shouldRespond, callback, []);
         }
+
+        if (responseContent && message.id) {
+          responseContent.inReplyTo = createUniqueUuid(runtime, message.id);
+        }
+
+        if (responseContent?.providers?.length && responseContent.providers.length > 0) {
+          state = await runtime.composeState(message, responseContent.providers || []);
+        }
+
+        if (responseContent) {
+          const mode = result.mode ?? ('actions' as StrategyMode);
+
+          if (mode === 'simple') {
+            // Log provider usage for simple responses
+            if (responseContent.providers && responseContent.providers.length > 0) {
+              runtime.logger.debug(
+                { providers: responseContent.providers },
+                '[Bootstrap] Simple response used providers'
+              );
+            }
+            // without actions there can't be more than one message
+            if (callback) {
+              await callback(responseContent);
+            }
+          } else if (mode === 'actions') {
+            await runtime.processActions(message, responseMessages, state, async (content) => {
+              runtime.logger.debug({ content }, 'action callback');
+              responseContent!.actionCallbacks = content;
+              if (callback) {
+                return callback(content);
+              }
+              return [];
+            });
+          }
+        }
+        
 
         // Clean up the response ID since we handled it
         agentResponses.delete(message.roomId);
@@ -452,7 +316,7 @@ const messageReceivedHandler = async ({
         await runtime.evaluate(
           message,
           state,
-          shouldRespond,
+          true,
           async (content) => {
             runtime.logger.debug({ content }, 'evaluate callback');
             if (responseContent) {
