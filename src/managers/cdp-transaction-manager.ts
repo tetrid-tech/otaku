@@ -14,7 +14,7 @@ import {
   UNISWAP_V3_QUOTER,
   WRAPPED_NATIVE_TOKEN,
   UNISWAP_POOL_FEES,
-} from '../constants/chains';
+} from '@/constants/chains';
 
 // ============================================================================
 // Types
@@ -122,6 +122,7 @@ export class CdpTransactionManager {
    * Get the singleton instance of CdpTransactionManager
    */
   public static getInstance(): CdpTransactionManager {
+    console.log('yoyoyoyoyoyoyo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CdpTransactionManager.instance', CdpTransactionManager.instance);
     if (!CdpTransactionManager.instance) {
       CdpTransactionManager.instance = new CdpTransactionManager();
     }
@@ -201,7 +202,10 @@ export class CdpTransactionManager {
     // Check cache first (unless force sync)
     if (!forceSync) {
       const cacheKey = chain ? `${userId}:${chain}` : userId;
+      console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ cacheKey', cacheKey);
       const cached = this.tokensCache.get(cacheKey);
+      console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! cached', cached);
+      console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! cached.timestamp', (Date.now() - (cached?.timestamp || 0)), this.CACHE_TTL);
       if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
         logger.info(`[CdpTransactionManager] Returning cached token balances for user: ${userId.substring(0, 8)}...${chain ? ` (chain: ${chain})` : ''}`);
         return { ...cached.data, fromCache: true };
@@ -257,6 +261,9 @@ export class CdpTransactionManager {
     let totalUsdValue = 0;
   
     for (const network of networksToFetch) {
+      const chainTokens: any[] = [];
+      let chainUsdValue = 0;
+      
       try {
         const chainConfig = getChainConfig(network);
         if (!chainConfig) {
@@ -289,10 +296,10 @@ export class CdpTransactionManager {
           
           // Only add to total if it's a valid number
           if (!isNaN(usdValue)) {
-            totalUsdValue += usdValue;
+            chainUsdValue += usdValue;
           }
   
-          allTokens.push({
+          const nativeToken = {
             symbol: chainConfig.nativeToken.symbol,
             name: chainConfig.nativeToken.name,
             balance: isNaN(amountNum) ? '0' : amountNum.toString(),
@@ -303,7 +310,8 @@ export class CdpTransactionManager {
             chain: network,
             decimals: chainConfig.nativeToken.decimals,
             icon: undefined,
-          });
+          };
+          chainTokens.push(nativeToken);
         }
   
         // Step 2: Fetch ERC20 token balances using Alchemy
@@ -356,10 +364,10 @@ export class CdpTransactionManager {
                 
                 // Only add to total if it's a valid number
                 if (!isNaN(usdValue)) {
-                  totalUsdValue += usdValue;
+                  chainUsdValue += usdValue;
                 }
                 
-                allTokens.push({
+                chainTokens.push({
                   symbol: dexInfo.symbol?.toUpperCase() || 'UNKNOWN',
                   name: dexInfo.name || 'Unknown Token',
                   balance: isNaN(amountNum) ? '0' : amountNum.toString(),
@@ -386,10 +394,10 @@ export class CdpTransactionManager {
             
             // Only add to total if it's a valid number
             if (!isNaN(usdValue)) {
-              totalUsdValue += usdValue;
+              chainUsdValue += usdValue;
             }
             
-            allTokens.push({
+            chainTokens.push({
               symbol: tokenInfo.symbol || 'UNKNOWN',
               name: tokenInfo.name || 'Unknown Token',
               balance: isNaN(amountNum) ? '0' : amountNum.toString(),
@@ -405,6 +413,24 @@ export class CdpTransactionManager {
             logger.warn(`[CDP API] Error processing token ${tokenBalance.contractAddress} on ${network}:`, err instanceof Error ? err.message : String(err));
           }
         }
+        
+        // Cache this chain's results immediately
+        const chainCacheKey = `${name}:${network}`;
+        console.log('############################# chainCacheKey', chainCacheKey);
+        const chainUsdValueFinal = isNaN(chainUsdValue) ? 0 : chainUsdValue;
+        this.tokensCache.set(chainCacheKey, {
+          data: {
+            tokens: chainTokens,
+            totalUsdValue: chainUsdValueFinal,
+            address,
+          },
+          timestamp: Date.now(),
+        });
+        logger.debug(`[CDP API] Cached tokens for ${network}: ${chainTokens.length} tokens, $${chainUsdValueFinal.toFixed(2)}`);
+        
+        // Add to overall results
+        allTokens.push(...chainTokens);
+        totalUsdValue += chainUsdValue;
       } catch (err) {
         logger.warn(`[CDP API] Failed to fetch balances for ${network}:`, err instanceof Error ? err.message : String(err));
       }
