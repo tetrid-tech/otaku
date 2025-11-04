@@ -674,7 +674,7 @@ function AppContent({
         </div>
 
         {/* Center - Chat Interface / Account */}
-        <div className="col-span-1 lg:col-span-7 h-full overflow-hidden">
+        <div className="col-span-1 lg:col-span-7 h-full overflow-auto lg:overflow-hidden">
           {currentView === 'account' ? (
             <AccountPage 
               totalBalance={totalBalance} 
