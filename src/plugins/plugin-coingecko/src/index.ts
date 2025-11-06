@@ -7,16 +7,18 @@ import { getTrendingSearchAction } from "./actions/getTrendingSearch.action";
 import { getTokenPriceChartAction } from "./actions/getTokenPriceChart.action";
 import { getCategoriesListAction } from "./actions/getCategoriesList.action";
 import { getCategoriesWithMarketDataAction } from "./actions/getCategoriesWithMarketData.action";
+import { getHistoricalPriceAction } from "./actions/getHistoricalPrice.action";
 
 export const coingeckoPlugin: Plugin = {
   name: "plugin-coingecko",
-  description: "CoinGecko plugin exposing token metadata lookup, trending tokens, NFT collection stats, trending searches, price charts, and coin categories",
+  description: "CoinGecko plugin exposing token metadata lookup, trending tokens, NFT collection stats, trending searches, price charts, historical prices, and coin categories",
   actions: [
     getTokenMetadataAction,
     getTrendingTokensAction,
     getNFTCollectionStatsAction,
     getTrendingSearchAction,
     getTokenPriceChartAction,
+    getHistoricalPriceAction,
     getCategoriesListAction,
     getCategoriesWithMarketDataAction,
   ],
@@ -34,6 +36,7 @@ export {
   getNFTCollectionStatsAction,
   getTrendingSearchAction,
   getTokenPriceChartAction,
+  getHistoricalPriceAction,
   getCategoriesListAction,
   getCategoriesWithMarketDataAction,
 };

@@ -1038,6 +1038,153 @@ export class CoinGeckoService extends Service {
   }
 
   /**
+   * Get historical price data for a token at a specific date
+   * Resolves token identifier (symbol or address) to coin_id, then fetches historical data
+   */
+  async getHistoricalPrice(
+    tokenIdentifier: string,
+    date: string,
+    chain: string = 'base'
+  ): Promise<{
+    token_identifier: string;
+    token_symbol: string | null;
+    token_name: string | null;
+    coin_id: string;
+    chain: string;
+    date: string;
+    price_usd: number | null;
+    market_cap_usd: number | null;
+    total_volume_usd: number | null;
+  }> {
+    const isPro = Boolean(this.proApiKey);
+    const baseUrl = isPro ? "https://pro-api.coingecko.com/api/v3" : "https://api.coingecko.com/api/v3";
+
+    // Validate date format (should be dd-mm-yyyy)
+    if (!/^\d{2}-\d{2}-\d{4}$/.test(date)) {
+      throw new Error(`Invalid date format: ${date}. Expected format: dd-mm-yyyy (e.g., 01-01-2024)`);
+    }
+
+    let coinId: string;
+    let tokenSymbol: string | null = null;
+    let tokenName: string | null = null;
+
+    // Check if it's a contract address (0x...)
+    const isContractAddress = /^0x[a-fA-F0-9]{40}$/.test(tokenIdentifier);
+
+    if (isContractAddress) {
+      // Resolve contract address to coin_id
+      logger.debug(`[CoinGecko] Resolving contract address ${tokenIdentifier} on ${chain}`);
+      
+      const platformMap: Record<string, string> = {
+        base: 'base',
+        ethereum: 'ethereum',
+        polygon: 'polygon-pos',
+        arbitrum: 'arbitrum-one',
+        optimism: 'optimistic-ethereum',
+      };
+      const platform = platformMap[chain.toLowerCase()] || chain;
+      
+      const contractUrl = `${baseUrl}/coins/${platform}/contract/${tokenIdentifier}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      
+      try {
+        const res = await fetch(contractUrl, {
+          headers: {
+            Accept: 'application/json',
+            ...(isPro && this.proApiKey ? { 'x-cg-pro-api-key': this.proApiKey } : {}),
+            'User-Agent': 'ElizaOS-CoinGecko-Plugin/1.0',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          const body = await safeReadJson(res);
+          throw new Error(`Failed to resolve contract address: ${res.status} ${res.statusText}${body ? ` - ${JSON.stringify(body)}` : ''}`);
+        }
+
+        const data = (await res.json()) as CoinGeckoTokenMetadata;
+        coinId = data.id;
+        tokenSymbol = data.symbol?.toUpperCase() || null;
+        tokenName = data.name || null;
+        logger.debug(`[CoinGecko] Resolved ${tokenIdentifier} to coin_id: ${coinId}`);
+      } catch (err) {
+        clearTimeout(timeout);
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to resolve contract address to coin_id: ${msg}`);
+      }
+    } else {
+      // Try to resolve as native token or symbol
+      const normalizedToken = tokenIdentifier.toLowerCase();
+      coinId = nativeTokenIds[normalizedToken] || normalizedToken;
+      tokenSymbol = tokenIdentifier.toUpperCase();
+      logger.debug(`[CoinGecko] Using coin_id: ${coinId} for token: ${tokenIdentifier}`);
+    }
+
+    // Fetch historical data
+    const historyUrl = `${baseUrl}/coins/${coinId}/history?date=${date}&localization=false`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      logger.debug(`[CoinGecko] GET ${historyUrl}`);
+      const res = await fetch(historyUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(isPro && this.proApiKey ? { 'x-cg-pro-api-key': this.proApiKey } : {}),
+          'User-Agent': 'ElizaOS-CoinGecko-Plugin/1.0',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const body = await safeReadJson(res);
+        const msg = `CoinGecko historical price API error ${res.status}: ${res.statusText}${body ? ` - ${JSON.stringify(body)}` : ''}`;
+        logger.warn(`[CoinGecko] historical price request failed for ${coinId} on ${date}: ${msg}`);
+        throw new Error(msg);
+      }
+
+      const data = (await res.json()) as CoinGeckoTokenMetadata;
+
+      // Extract market data
+      const marketData = (data.market_data || {}) as {
+        current_price?: { usd?: number };
+        market_cap?: { usd?: number };
+        total_volume?: { usd?: number };
+      };
+
+      // Use token name from historical response if not already set
+      if (!tokenName) {
+        tokenName = data.name || null;
+      }
+      if (!tokenSymbol) {
+        tokenSymbol = data.symbol?.toUpperCase() || null;
+      }
+
+      return {
+        token_identifier: tokenIdentifier,
+        token_symbol: tokenSymbol,
+        token_name: tokenName,
+        coin_id: coinId,
+        chain: chain,
+        date: date,
+        price_usd: marketData.current_price?.usd || null,
+        market_cap_usd: marketData.market_cap?.usd || null,
+        total_volume_usd: marketData.total_volume?.usd || null,
+      };
+    } catch (err) {
+      clearTimeout(timeout);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[CoinGecko] getHistoricalPrice failed for ${coinId} on ${date}: ${msg}`);
+      throw err;
+    }
+  }
+
+  /**
    * Get list of all coin categories (ID map)
    * Uses Pro API when COINGECKO_API_KEY is set; otherwise public API.
    */
